@@ -1,0 +1,42 @@
+name: data
+# Elke ochtend: verse kaartencatalogus (TCGdex) en de prijslijst van Cardmarket naar de branch "data".
+on:
+  schedule:
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["build/**", ".github/workflows/**"]
+permissions:
+  contents: write
+concurrency: data
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Vorige data ophalen (reserve als een download mislukt)
+        run: |
+          mkdir -p /tmp/prev
+          if git fetch -q --depth 1 origin data; then git archive origin/data | tar -x -C /tmp/prev; fi
+      - name: Kaartencatalogus bouwen
+        run: |
+          git clone -q --depth 1 https://github.com/tcgdex/cards-database.git /tmp/tcgdex
+          bun build/export.ts /tmp/tcgdex /tmp/catalog.json
+      - name: Cardmarket bestanden downloaden
+        run: |
+          B=https://downloads.s3.cardmarket.com/productCatalog
+          curl -fsSL --retry 3 -o /tmp/prices.json  "$B/priceGuide/price_guide_6.json"        || rm -f /tmp/prices.json
+          curl -fsSL --retry 3 -o /tmp/products.json "$B/productList/products_singles_6.json" || rm -f /tmp/products.json
+          ls -la /tmp/*.json
+      - name: Compacte bestanden maken
+        run: python3 build/build_data.py /tmp/catalog.json /tmp/prices.json /tmp/products.json /tmp/prev /tmp/out
+      - name: Publiceren op branch data (zonder geschiedenis, zodat de repo klein blijft)
+        run: |
+          cd /tmp/out
+          git init -q -b data
+          git add -A
+          git -c user.name=kaartpricer -c user.email=kaartpricer@users.noreply.github.com commit -q -m "data $(date -u +%F)"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
