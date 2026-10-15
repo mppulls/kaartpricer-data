@@ -1,0 +1,931 @@
+<title>MP Kaartscan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: één kolom met de nieuwste scan bovenaan, een vaste kop met totalen en bod percentage,
+   en een vaste scanbalk onderin. De holo ring om de scanknop is het enige uitgesproken accent. */
+:root {
+  --bg: #f2f3f6;
+  --surface: #ffffff;
+  --surface-2: #e9ecf2;
+  --ink: #11141b;
+  --muted: #5b6475;
+  --line: #dfe3ea;
+  --accent: #2a43e6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eaff;
+  --ok: #0d7a53;
+  --warn: #9a5200;
+  --warn-soft: #fff1dc;
+  --bad: #b8301a;
+  --bad-soft: #fde9e6;
+  --new: #e6eaff;
+  --shade: rgba(17, 20, 27, .45);
+  --shadow: 0 1px 2px rgba(17, 20, 27, .06), 0 6px 20px rgba(17, 20, 27, .07);
+  --f-ui: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-code: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
+    --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --warn: #f1a640; --warn-soft: #2b2112;
+    --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
+  --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --warn: #f1a640; --warn-soft: #2b2112;
+  --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.35;
+  -webkit-tap-highlight-color: transparent; padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.num { font-variant-numeric: tabular-nums; }
+.code { font-family: var(--f-code); font-size: 12px; letter-spacing: .02em; }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* kop */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top .wrap { padding-block: 10px 12px; display: grid; gap: 10px; }
+.row1 { display: flex; align-items: center; gap: 8px; }
+.listbtn { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
+.listbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listbtn svg { flex: none; color: var(--muted); }
+.spacer { flex: 1; }
+.iconbtn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
+.iconbtn:active { background: var(--surface-2); }
+.stats { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: end; }
+.stat small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.stat b { font-size: 17px; font-weight: 600; }
+.stat.offer b { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+.stat.offer { text-align: right; }
+.pctbtn { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; vertical-align: 2px; }
+.pctrow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.pctrow::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pctin { flex: none; width: 76px; height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-weight: 600; }
+.tabs { display: flex; gap: 6px; }
+.tab { height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.tab[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tab .cnt { color: var(--warn); margin-left: 4px; }
+.meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex: 1; text-align: right; }
+
+/* feed */
+main .wrap { padding-block: 14px; display: grid; gap: 14px; }
+.notice { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; font-size: 14px; color: var(--muted); }
+.notice b { color: var(--ink); }
+.empty { text-align: center; padding: 48px 12px 24px; display: grid; gap: 10px; justify-items: center; }
+.empty h2 { margin: 0; font-size: 20px; text-wrap: balance; }
+.empty p { margin: 0; color: var(--muted); max-width: 34ch; }
+.ghostgrid { display: grid; grid-template-columns: repeat(3, 34px); gap: 6px; margin-bottom: 8px; }
+.ghostgrid i { height: 46px; border-radius: 5px; border: 1.5px dashed var(--line); }
+.scan { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.scanhead { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.scanhead img, .scanhead .ph { width: 30px; height: 40px; border-radius: 5px; object-fit: cover; background: var(--surface-2); flex: none; }
+.scanhead .t { min-width: 0; flex: 1; }
+.scanhead .t b { display: block; font-size: 14px; }
+.scanhead .t small { color: var(--muted); font-size: 12px; }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.pill.busy { background: var(--accent-soft); color: var(--accent); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { color: var(--ok); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.linkbtn { color: var(--accent); font-weight: 600; font-size: 13px; padding: 4px 2px; }
+
+.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); position: relative; }
+.card:first-child { border-top: 0; }
+.card.check::before, .card.none::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--warn); }
+.card.none::before { background: var(--bad); }
+.card.fresh { animation: fresh 2.4s ease-out; }
+@keyframes fresh { 0% { background: var(--new); } 100% { background: transparent; } }
+.thumb { width: 40px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.info { min-width: 0; }
+.info b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info .sub { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 2px; flex-wrap: wrap; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.rev { background: var(--accent-soft); color: var(--accent); }
+.price { text-align: right; }
+.price b { display: block; font-size: 17px; font-weight: 700; }
+.price small { color: var(--muted); font-size: 12px; }
+.price small.own { color: var(--accent); font-weight: 600; }
+.skel { height: 56px; margin: 10px 12px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-2), var(--bg), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.detail { grid-column: 1 / -1; display: grid; gap: 10px; padding-top: 4px; }
+.detail .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.alts { display: flex; flex-wrap: wrap; gap: 6px; }
+.alt { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; text-align: left; }
+.alt .code { display: block; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { height: 38px; padding: 0 14px; border-radius: 11px; background: var(--surface-2); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--bad); }
+.btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.own { display: flex; gap: 8px; align-items: center; }
+.own input { width: 110px; height: 38px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-weight: 600; }
+.fine { font-size: 12px; color: var(--muted); }
+
+/* scanbalk */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-top: 18px; }
+.dock .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.side { height: 48px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.queue { justify-self: end; font-size: 12px; color: var(--muted); text-align: right; }
+.fab { position: relative; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; isolation: isolate; }
+.fab::before { content: ""; position: absolute; inset: 0; border-radius: 50%; z-index: -2;
+  background: conic-gradient(from var(--spin, 0deg), #ff8a8a, #ffd36e, #8cf0b4, #77c6ff, #b59cff, #ff8ad8, #ff8a8a);
+  animation: spin 6s linear infinite; }
+.fab::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--ink); z-index: -1; }
+.fab svg { color: var(--bg); }
+.fab:active { transform: scale(.96); }
+@property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin { to { --spin: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .fab::before, .dot, .skel { animation: none; } .card.fresh { animation: none; } }
+
+/* vellen */
+.sheet { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; background: var(--shade); }
+.sheet > div { background: var(--surface); border-radius: 20px 20px 0 0; max-height: 86vh; overflow: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; max-width: 640px; width: 100%; margin: 0 auto; }
+.sheet h3 { margin: 0; font-size: 17px; }
+.sheet .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); text-align: left; width: 100%; }
+.sheet .item .t { flex: 1; min-width: 0; }
+.sheet .item small { color: var(--muted); display: block; font-size: 12px; }
+.sheet .item.on { outline: 2px solid var(--accent); }
+.field { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
+.sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row1">
+      <button class="listbtn" id="listBtn" type="button" aria-label="Kies lijst"><span id="listName">Kaartscan</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="menuBtn" type="button" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+    </div>
+    <div class="stats">
+      <div class="stat"><small>Kaarten</small><b class="num" id="sCount">0</b></div>
+      <div class="stat"><small>Trend</small><b class="num" id="sTrend">€ 0,00</b></div>
+      <div class="stat offer"><small>Bod <button class="pctbtn" id="pctBtn" type="button" aria-expanded="false"><span id="pctLbl">70%</span></button></small><b class="num" id="sOffer">€ 0,00</b></div>
+    </div>
+    <div class="pctrow" id="pctRow" hidden></div>
+    <div class="row1">
+      <div class="tabs" role="group" aria-label="Filter">
+        <button class="tab" id="tabAll" type="button" aria-pressed="true">Alles</button>
+        <button class="tab" id="tabCheck" type="button" aria-pressed="false">Controleren<span class="cnt num" id="checkCnt"></span></button>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+</header>
+
+<main><div class="wrap" id="feed"></div></main>
+
+<div class="dock">
+  <div class="wrap">
+    <label class="side" for="pickGallery">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg>Foto's</label>
+    <label class="fab" for="pickCamera" aria-label="Scan met camera">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg></label>
+    <div class="queue num" id="queue" aria-live="polite"></div>
+  </div>
+  <input class="sr" type="file" id="pickCamera" accept="image/*" capture="environment">
+  <input class="sr" type="file" id="pickGallery" accept="image/*" multiple>
+</div>
+
+<div id="sheetHost"></div>
+<div id="toastHost" aria-live="polite"></div>
+
+<script>
+"use strict";
+const SHEET_ID = "1A4MfpmtCSeFfYpSJ72w6lDzyk9Q35PNqxV0NBQ6-rfE";
+const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const cmLink = pid => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=2&language=1`;
+const round2 = x => Math.round(x * 100) / 100;
+const fmtDate = d => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+const parseDate = s => new Date(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+const fmtTime = t => { const d = new Date(t); return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }); };
+
+/* ---------------------------------------------------------------- catalogus */
+const CAT = { ready: false, cards: [], byLocal: new Map(), byName: new Map(), byKey: new Map(), sets: [] };
+const PR = { datum: null, p: {} };
+const PLAIN = new Set(["", "common", "uncommon", "rare", "holo rare", "double rare", "holo rare v", "holo rare vmax", "holo rare vstar", "none", "rare holo", "amazing rare", "radiant rare", "ace spec rare", "rare holo ex", "rare holo gx", "rare holo lv.x"]);
+const LABELS = new Set(["ultra", "rare", "attack", "full", "art", "alt", "sir", "ir", "hyper", "gold", "secret", "illustration", "special", "holo", "reverse", "promo"]);
+const SUF = new Set(["ex", "gx", "v", "vmax", "vstar", "break", "lv", "x", "star"]);
+
+function norm(s) {
+  return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’']s\b/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
+}
+function lev(a, b) {
+  if (a === b) return 0; const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+const sim = (a, b) => (a || b) ? 1 - lev(a, b) / Math.max(a.length, b.length) : 1;
+function nameScore(q, c) {
+  const Q = norm(q), C = norm(c);
+  let qs = Q.filter(t => !SUF.has(t) && !LABELS.has(t)); if (!qs.length) qs = Q.filter(t => !SUF.has(t));
+  const cs = C.filter(t => !SUF.has(t));
+  if (!qs.length || !cs.length) return 0;
+  const rc = cs.filter(t => Math.max(...qs.map(u => sim(t, u))) >= 0.72).length / cs.length;
+  const rq = qs.filter(u => Math.max(...cs.map(t => sim(u, t))) >= 0.72).length / qs.length;
+  return Math.max(sim(qs.join(""), cs.join("")), 0.6 * Math.max(rc, rq) + 0.4 * Math.min(rc, rq));
+}
+function parseNumber(num) {
+  num = String(num || "").trim().toUpperCase().replace(/\s+/g, "");
+  const [left = "", right = ""] = num.split("/");
+  const m = /^([A-Z]*)0*(\d+)([A-Z]?)$/.exec(left);
+  return { lid: m ? m[1] + m[2] + m[3] : left, total: /^\d+$/.test(right) ? parseInt(right, 10) : null };
+}
+async function loadData() {
+  const [c, p] = await Promise.all([
+    fetch("catalog.json", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("catalogus"); return r.json(); }),
+    fetch("prices.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { datum: null, p: {} }).catch(() => ({ datum: null, p: {} })),
+  ]);
+  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || "", total: s[3] || 0, rel: s[4] || "" }));
+  c.cards.forEach(r => {
+    const set = CAT.sets[r[0]], rar = c.rarities[r[5]] || "", tok = norm(r[2]);
+    const card = {
+      sid: set.id, set, lid: r[1], name: r[2], hp: r[3] || 0, atk: new Set(String(r[4] || "").split("|").filter(Boolean).map(a => norm(a).join(" "))),
+      rar, plain: PLAIN.has(rar.toLowerCase()), promo: /promo/i.test(rar) || /promo/i.test(set.name), pids: r[6] || [],
+      nn: tok.join(" "), suf: tok.filter(t => SUF.has(t)).join(" "),
+    };
+    card.key = card.sid + "|" + card.lid;
+    CAT.cards.push(card); CAT.byKey.set(card.key, card);
+    const lk = parseNumber(card.lid).lid;
+    if (!CAT.byLocal.has(lk)) CAT.byLocal.set(lk, []); CAT.byLocal.get(lk).push(card);
+    if (!CAT.byName.has(card.nn)) CAT.byName.set(card.nn, []); CAT.byName.get(card.nn).push(card);
+  });
+  PR.datum = p.datum; PR.p = p.p || {};
+  CAT.ready = true;
+}
+function pidOf(card) { if (!card) return null; return card.pids.find(p => PR.p[p]) || card.pids[0] || null; }
+function trendOf(card, rev) {
+  const pid = pidOf(card); const v = pid && PR.p[pid]; if (!v) return null;
+  const x = rev ? v[1] : v[0]; return (typeof x === "number" && x > 0) ? x : null;
+}
+const codeOf = card => card.set.code || card.set.id;
+function numOf(card, read) {
+  const left = String(read || "").toUpperCase().replace(/\s+/g, "").split("/")[0];
+  if (left && parseNumber(left).lid === parseNumber(card.lid).lid) return left;
+  return /^\d+$/.test(card.lid) && card.set.rel >= "2020" ? card.lid.padStart(3, "0") : card.lid;
+}
+
+/* ---------------------------------------------------------------- herkennen */
+function decide(name, number, code) {
+  const { lid, total } = parseNumber(number); const out = [];
+  for (const c of CAT.byLocal.get(lid) || []) {
+    const ns = name ? nameScore(name, c.name) : 0.5; let score = ns, anchored = false;
+    if (total != null) { if (c.set.total === total) { score += 0.5; anchored = true; } else score -= 0.35; }
+    if (code && c.set.code && code.toUpperCase() === c.set.code.toUpperCase()) { score += 0.6; anchored = true; }
+    if (ns >= 0.4 || (code && anchored)) out.push({ score, ns, anchored, c });
+  }
+  out.sort((a, b) => b.score - a.score);
+  if (!out.length) return null;
+  const best = out[0], alts = out.slice(1, 8).map(x => x.c);
+  if (out[1] && best.score - out[1].score < 0.15) return { st: "check", card: best.c, alts };
+  if ((best.anchored && best.ns >= 0.55) || (!best.anchored && best.ns >= 0.85)) return { st: "ok", card: best.c, alts: [] };
+  return { st: "check", card: best.c, alts };
+}
+function byName(name, hp, attacks) {
+  const tok = norm(name), nn = tok.join(" "), suf = tok.filter(t => SUF.has(t)).join(" ");
+  let r = CAT.byName.get(nn) || [];
+  if (!r.length) r = CAT.cards.filter(c => c.suf === suf && nameScore(name, c.name) >= 0.8);
+  if (hp) { const f = r.filter(c => !c.hp || c.hp === Number(hp)); if (f.length) r = f; }
+  if (attacks && attacks.length) {
+    const A = attacks.map(a => norm(a).join(" ")).filter(Boolean);
+    const f = r.filter(c => A.some(a => c.atk.has(a))); if (f.length) r = f;
+  }
+  return r;
+}
+function stickerValue(s) {
+  const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(s || "")); if (!m) return null;
+  const v = parseFloat(m[1].replace(",", ".")); return v > 0 && v < 100000 ? v : null;
+}
+function identify(r) {
+  const lang = String(r.lang || "en").toLowerCase();
+  if (!CAT.ready) return { st: "none" };
+  if (!["en", "eng", "english"].includes(lang)) return { st: "none", lang: lang.toUpperCase() };
+  const code = String(r.set || "").toUpperCase().replace(/\s*EN$/, "").trim();
+  let d = null;
+  if (r.number) { d = decide(r.name, r.number, code); if (d && d.st === "ok") return d; }
+  let c = r.name ? byName(r.name, r.hp, r.attacks) : [];
+  if (!c.length) return d || { st: "none" };
+  const { total } = parseNumber(r.number);
+  if (code) { const f = c.filter(x => x.set.code.toUpperCase() === code); if (f.length) c = f; }
+  if (total) { const f = c.filter(x => x.set.total === total); if (f.length) c = f; }
+  if (r.art && c.length > 1) {
+    const f = r.art === "full" ? c.filter(x => !x.plain) : c.filter(x => x.plain || x.promo);
+    if (f.length) c = f;
+  }
+  if (c.length === 1) return { st: "ok", card: c[0], alts: [] };
+  c = [...c].sort((a, b) => (b.set.rel || "").localeCompare(a.set.rel || ""));
+  let pick = c[0]; const sv = stickerValue(r.sticker);
+  if (sv) {
+    let best = Infinity;
+    for (const x of c) { const t = trendOf(x, false); if (t) { const dd = Math.abs(Math.log(t / sv)); if (dd < best) { best = dd; pick = x; } } }
+  }
+  return { st: "check", card: pick, alts: c.filter(x => x !== pick).slice(0, 8) };
+}
+function applyId(k, res) {
+  k.st = res.st; k.sid = res.card ? res.card.sid : null; k.lid = res.card ? res.card.lid : null;
+  k.alts = (res.alts || []).map(a => [a.sid, a.lid]); if (res.lang) k.lang = res.lang;
+}
+
+/* ---------------------------------------------------------------- beelden */
+async function toBitmap(file) {
+  try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch {
+    const url = URL.createObjectURL(file);
+    try { const img = new Image(); img.src = url; await img.decode(); return await createImageBitmap(img); }
+    finally { URL.revokeObjectURL(url); }
+  }
+}
+function canvasOf(w, h) { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function toBlob(c, q) { return new Promise(res => c.toBlob(res, "image/jpeg", q)); }
+async function scaled(bm, maxPixels, q) {
+  const s = Math.min(1, Math.sqrt(maxPixels / (bm.width * bm.height)));
+  const c = canvasOf(bm.width * s, bm.height * s); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height); return toBlob(c, q);
+}
+function boxPx(bm, box, pad, dim) {
+  if (!Array.isArray(box) || box.length < 4) return null;
+  let [x0, y0, x1, y1] = box.map(Number);
+  if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
+  if (Math.max(x0, y0, x1, y1) > 1.5) {            // pixels van de verstuurde foto of promille
+    const [W, H] = dim || [1000, 1000];
+    x0 /= W; x1 /= W; y0 /= H; y1 /= H;
+  }
+  const w = x1 - x0, h = y1 - y0; if (w <= 0 || h <= 0) return null;
+  x0 = Math.max(0, x0 - w * pad); x1 = Math.min(1, x1 + w * pad); y0 = Math.max(0, y0 - h * pad); y1 = Math.min(1, y1 + h * pad);
+  return [x0 * bm.width, y0 * bm.height, (x1 - x0) * bm.width, (y1 - y0) * bm.height];
+}
+function cropCanvas(bm, box, pad, maxSide, dim) {
+  const p = boxPx(bm, box, pad, dim); if (!p) return null;
+  const s = Math.min(1, maxSide / Math.max(p[2], p[3]));
+  const c = canvasOf(p[2] * s, p[3] * s); c.getContext("2d").drawImage(bm, p[0], p[1], p[2], p[3], 0, 0, c.width, c.height); return c;
+}
+function thumbOf(bm, box, dim) {
+  const p = boxPx(bm, box, 0.02, dim); if (!p) return null;
+  const c = canvasOf(64, 90), g = c.getContext("2d"); const s = Math.max(64 / p[2], 90 / p[3]);
+  const w = 64 / s, h = 90 / s; g.drawImage(bm, p[0] + (p[2] - w) / 2, p[1] + (p[3] - h) / 2, w, h, 0, 0, 64, 90);
+  return c.toDataURL("image/jpeg", 0.62);
+}
+function photoThumb(bm) { const s = 96 / Math.max(bm.width, bm.height); const c = canvasOf(bm.width * s, bm.height * s); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.6); }
+
+/* ---------------------------------------------------------------- opslag */
+const S = { db: null, sample: null, mcp: null, limits: null, lists: [], listId: null, scans: new Map(), live: new Map(),
+  filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false };
+const listOf = () => S.lists.find(l => l.id === S.listId) || null;
+const pct = () => { const l = listOf(); return l && Number.isFinite(l.pct) ? l.pct : 70; };
+const chains = new Map();
+function serial(path, fn) { const p = (chains.get(path) || Promise.resolve()).then(fn, fn); chains.set(path, p.catch(() => {})); return p; }
+
+function saveLocal() {
+  if (!S.local) return;
+  try { localStorage.setItem("kaartscan", JSON.stringify({ lists: S.lists, scans: [...S.scans.values()] })); } catch {}
+}
+function loadLocal() {
+  try { const j = JSON.parse(localStorage.getItem("kaartscan") || "null"); if (j) { S.lists = j.lists || []; (j.scans || []).forEach(s => S.scans.set(s.id, s)); } } catch {}
+}
+async function putList(l) {
+  const i = S.lists.findIndex(x => x.id === l.id); if (i >= 0) S.lists[i] = l; else S.lists.unshift(l);
+  if (S.db) await serial("lijsten/" + l.id, () => S.db.doc("lijsten/" + l.id).set(stripId(l))); else saveLocal();
+}
+function stripId(o) { const { id, ...rest } = o; return rest; }
+async function putScan(s) {
+  const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null,
+    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, eigen: Number.isFinite(k.eigen) ? k.eigen : null, thumb: k.thumb || null, lang: k.lang || null })) };
+  if (S.db) {
+    const path = `lijsten/${s.list}/scans/${s.id}`;
+    try { await serial(path, () => S.db.doc(path).set(body)); }
+    catch (e) {
+      if (e && e.code === "invalid_argument" || e && e.code === "quota_exceeded") {
+        body.kaarten = body.kaarten.map(k => ({ ...k, thumb: null })); body.foto = null;
+        await serial(path, () => S.db.doc(path).set(body)); toast("Opgeslagen zonder plaatjes, de opslag is vol");
+      } else throw e;
+    }
+  } else { S.scans.set(s.id, s); saveLocal(); }
+}
+async function deleteScanDoc(s) {
+  if (S.db) await serial(`lijsten/${s.list}/scans/${s.id}`, () => S.db.doc(`lijsten/${s.list}/scans/${s.id}`).delete());
+  S.scans.delete(s.id); S.live.delete(s.id); saveLocal();
+}
+function watchLists() {
+  S.db.collection("lijsten").orderBy("t", "desc").limit(200).onSnapshot(snap => {
+    S.lists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!S.listId || !S.lists.some(l => l.id === S.listId)) {
+      let want = null; try { want = localStorage.getItem("kaartscan.list"); } catch {}
+      const pick = S.lists.find(l => l.id === want) || S.lists[0];
+      if (pick) selectList(pick.id);
+    }
+    render();
+  }, e => toast("Lijsten laden lukt niet: " + (e && e.code || "fout")));
+}
+function selectList(id) {
+  S.listId = id; try { localStorage.setItem("kaartscan.list", id); } catch {}
+  S.open = null; S.scans = new Map();
+  if (S.unsubScans) { S.unsubScans(); S.unsubScans = null; }
+  if (S.db && id) {
+    S.unsubScans = S.db.doc("lijsten/" + id).collection("scans").orderBy("t", "desc").limit(1000).onSnapshot(snap => {
+      const m = new Map(); snap.docs.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
+      S.scans = m;
+      for (const [sid, l] of S.live) if (m.has(sid) && (l.status === "klaar" || l.status === "leeg")) S.live.delete(sid);
+      render();
+    }, e => toast("Scans laden lukt niet: " + (e && e.code || "fout")));
+  } else if (S.local) { loadLocal(); }
+  render();
+}
+async function newList(name) {
+  const now = new Date(); const l = { id: uid(), naam: name || `Beurs ${fmtDate(now)}`, t: Date.now(), pct: pct() };
+  await putList(l); selectList(l.id); return l;
+}
+async function ensureList() { if (!listOf()) await newList(); return listOf(); }
+
+/* ---------------------------------------------------------------- scannen */
+const STEP1 = `You are reading a phone photo of Pokémon trading cards: usually one binder page in a 3x3 grid, sometimes loose cards on a table.
+List every card that is fully or mostly visible, row by row, left to right. Skip empty pockets, and skip cards that are cut off at the photo edge or belong to the facing page.
+Write exactly one line of JSON per card and nothing else (no code fence, no commentary):
+{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","lang":"en","sticker":null}
+box: the card outline as fractions (0 to 1) of the photo width and height.
+name: exactly as printed, with ex, V, VMAX, VSTAR, GX and owner prefixes such as N's, Misty's or Team Rocket's. Trainers and energy: the card title.
+hp: the number, or null. attacks: up to two ability or attack names as printed.
+set and number: the set code and card number from the bottom left print line (like "MEW" and "205/165", or "SVP" and "053"), only if you can really read them, else null. Never guess.
+art: "full" when the artwork covers the whole card (illustration rare, full art, special illustration rare, gold), else "regular".
+lang: the card language as a code, like "en", "ja", "ko", "de".
+sticker: the text of a price sticker on the sleeve, else null.`;
+const STEP2 = `Each image is one Pokémon card. Read only the small print line at the bottom left of the card: the set code (letters such as MEW, PAF, SVP, MEP, JTG, often followed by EN) and the card number (like 205/165, TG13/TG30, SWSH291 or 053).
+Write exactly one line of JSON per image, in image order, and nothing else: {"i":0,"set":"MEW","number":"205/165"}
+Use null for anything you cannot read with certainty. Never guess.`;
+
+function parseLine(line) {
+  const s = line.trim().replace(/^```(json)?/, "").replace(/```$/, "").replace(/^[-*\d.)\s]+(?=\{)/, "").replace(/,$/, "");
+  if (!s.startsWith("{")) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+function addFiles(files) {
+  const arr = [...files].filter(f => f && f.type !== "" ? f.type.startsWith("image/") : true);
+  if (!arr.length) return;
+  ensureList().then(list => {
+    for (const f of arr) {
+      const s = { id: uid(), list: list.id, t: Date.now(), status: "wacht", kaarten: [], foto: null, n: 0, _v: 0 };
+      S.live.set(s.id, s); S.queue.push({ id: s.id, file: f, tier: "quick" });
+    }
+    render(); pump();
+  });
+}
+function pump() {
+  if (!navigator.onLine) { render(); return; }
+  while (S.running < 2 && S.queue.length) { const job = S.queue.shift(); S.running++; runJob(job).finally(() => { S.running--; render(); pump(); }); }
+  render();
+}
+window.addEventListener("online", () => { for (const s of S.live.values()) if (s.status === "offline") { s.status = "wacht"; } pump(); });
+
+function errText(e) {
+  const c = e && e.code;
+  if (c === "not_granted") return "Claude mag deze pagina niet gebruiken. Sta het toe en probeer opnieuw.";
+  if (c === "rate_limited") return "Even te veel tegelijk of je gebruikslimiet is bereikt. Probeer zo opnieuw.";
+  if (c === "images_unavailable") return "Foto's versturen kan niet in deze weergave. Open de pagina in de Claude app of op claude.ai.";
+  if (c === "image_rejected") return "Deze foto wordt niet geaccepteerd. Maak een nieuwe foto.";
+  if (c === "session_expired") return "Je bent uitgelogd. Log opnieuw in op claude.ai.";
+  if (c === "sampling_disabled") return "Claude is niet beschikbaar voor dit account.";
+  return "Lezen mislukt. Controleer je verbinding en probeer opnieuw.";
+}
+async function runJob(job) {
+  const s = S.live.get(job.id); if (!s) return;
+  if (!S.sample) { s.status = "fout"; s.err = "Claude vragen is niet beschikbaar in deze weergave. Open de pagina in de Claude app of op claude.ai."; s._v++; return; }
+  if (!navigator.onLine) { s.status = "offline"; S.queue.unshift(job); s._v++; return; }
+  try {
+    let bm = S.bitmaps.get(s.id);
+    if (!bm) { bm = await toBitmap(job.file); keepBitmap(s.id, bm); }
+    if (!s.foto) s.foto = photoThumb(bm);
+    s.status = "lezen"; s.err = null; s.kaarten = []; s._v++; render();
+    const f1 = Math.min(1, Math.sqrt(1150000 / (bm.width * bm.height))); s.dim = [Math.round(bm.width * f1), Math.round(bm.height * f1)];
+    const blob = await scaled(bm, 1150000, 0.86);
+    let pending = "";
+    const take = line => {
+      const r = parseLine(line); if (!r || !(r.name || r.box)) return;
+      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null }, rev: false, eigen: null };
+      applyId(k, identify(k.lez)); k.thumb = k.box ? thumbOf(bm, k.box, s.dim) : null;
+      s.kaarten.push(k); S.fresh.add(k.k); s._v++; render();
+    };
+    const opts = { images: [blob], modelTier: job.tier, onText: ({ delta }) => { const lines = (pending + delta).split("\n"); pending = lines.pop(); lines.forEach(take); } };
+    if (job.tier === "default") opts.effort = "low";
+    if (job.retry) opts.cache = false;
+    await S.sample(STEP1, opts);
+    if (pending.trim()) take(pending);
+    if (!s.kaarten.length) { s.status = "leeg"; s._v++; await persist(s); return; }
+    const need = s.kaarten.filter(k => k.st !== "ok" && k.box && !k.lang);
+    if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need, job.tier); }
+    s.status = "klaar"; s.n = s.kaarten.length; s._v++; render();
+    await persist(s);
+  } catch (e) {
+    if (e && e.code === "cancelled") return;
+    if (!navigator.onLine || (e && e.code === "upstream_error" && !navigator.onLine)) { s.status = "offline"; S.queue.unshift(job); }
+    else { s.status = "fout"; s.err = errText(e); s.retryJob = job; }
+    s._v++; render();
+  }
+}
+async function readNumbers(s, bm, need, tier) {
+  const max = (S.limits && S.limits.images && S.limits.images.maxCount) || 5;
+  for (let i = 0; i < need.length; i += max) {
+    const part = need.slice(i, i + max);
+    const blobs = []; for (const k of part) { const c = cropCanvas(bm, k.box, 0.06, 1100, s.dim); blobs.push(c ? await toBlob(c, 0.88) : null); }
+    const items = part.map((k, j) => ({ k, b: blobs[j] })).filter(x => x.b);
+    if (!items.length) continue;
+    try {
+      const { text } = await S.sample(STEP2, { images: items.map(x => x.b), modelTier: tier });
+      text.split("\n").map(parseLine).filter(Boolean).forEach(r => {
+        const it = items[Number(r.i)]; if (!it) return;
+        const k = it.k; if (r.set) k.lez.set = r.set; if (r.number) k.lez.number = r.number;
+        applyId(k, identify(k.lez));
+      });
+      s._v++; render();
+    } catch (e) { if (e && (e.code === "not_granted" || e.code === "rate_limited")) throw e; }
+  }
+}
+async function persist(s) {
+  if (!S.db && !S.local) return;
+  try { await putScan(s); if (!S.db) { S.live.delete(s.id); render(); } }
+  catch (e) { s.err = "Opslaan mislukt. De kaarten blijven zichtbaar tot je de pagina sluit."; s._v++; render(); }
+}
+function keepBitmap(id, bm) {
+  S.bitmaps.set(id, bm);
+  while (S.bitmaps.size > 6) { const [old, b] = S.bitmaps.entries().next().value; try { b.close(); } catch {} S.bitmaps.delete(old); }
+}
+function retryScan(s, tier) {
+  const bm = S.bitmaps.get(s.id); const job = s.retryJob || null;
+  if (!bm && !(job && job.file)) { toast("De foto is niet meer in het geheugen. Maak een nieuwe foto."); return; }
+  const live = { ...s, kaarten: [], status: "wacht", _v: (s._v || 0) + 1, err: null };
+  S.live.set(s.id, live);
+  S.queue.push({ id: s.id, file: job ? job.file : null, tier: tier || "quick", retry: true }); pump();
+}
+
+/* ---------------------------------------------------------------- bewerken */
+function allScans() {
+  const m = new Map(S.scans); for (const [id, l] of S.live) m.set(id, l);
+  return [...m.values()].filter(s => s.list === S.listId || !s.list).sort((a, b) => b.t - a.t);
+}
+function scanById(id) { return S.live.get(id) || S.scans.get(id); }
+async function editCard(scanId, key, fn) {
+  const s = scanById(scanId); if (!s) return;
+  if (S.live.has(scanId) && s.status !== "klaar") {
+    const k = s.kaarten.find(x => x.k === key); if (!k) return; fn(k, s);
+    s.kaarten = s.kaarten.filter(x => !x._del); s._v++; render(); return;
+  }
+  const copy = { ...s, kaarten: s.kaarten.map(k => ({ ...k })) };
+  const k = copy.kaarten.find(x => x.k === key); if (!k) return;
+  fn(k, copy);
+  copy.kaarten = copy.kaarten.filter(x => !x._del); copy.n = copy.kaarten.length; copy._v = (s._v || 0) + 1;
+  if (S.live.has(scanId)) { S.live.set(scanId, copy); render(); if (copy.status === "klaar") await persist(copy); return; }
+  S.scans.set(scanId, copy); render();
+  try { await putScan(copy); } catch { toast("Opslaan mislukt, probeer het opnieuw"); }
+}
+function priceOf(k) {
+  const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
+  const trend = card ? trendOf(card, k.rev) : null;
+  const base = Number.isFinite(k.eigen) && k.eigen !== null ? k.eigen : trend;
+  return { card, trend, base, bod: base != null ? round2(base * pct() / 100) : null };
+}
+
+/* ---------------------------------------------------------------- tekenen */
+let rendering = false;
+const bannerEl = document.createElement("div"); bannerEl.style.display = "grid"; bannerEl.style.gap = "14px";
+document.addEventListener("animationend", e => { if (e.target.classList && e.target.classList.contains("fresh")) e.target.classList.remove("fresh"); });
+function render() { if (rendering) return; rendering = true; requestAnimationFrame(() => { rendering = false; draw(); }); }
+const groupCache = new Map();
+function draw() {
+  const list = listOf(); const scans = allScans();
+  $("#listName").textContent = list ? list.naam : "Kaartscan";
+  let n = 0, tr = 0, of = 0, chk = 0;
+  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (k.st !== "ok") chk++; }
+  $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of);
+  $("#pctLbl").textContent = pct() + "%"; $("#checkCnt").textContent = chk ? chk : "";
+  const waiting = S.queue.length + S.running;
+  $("#queue").textContent = !navigator.onLine && [...S.live.values()].some(s => s.status === "offline") ? "Geen verbinding, foto's wachten" : waiting ? `${waiting} ${waiting === 1 ? "foto" : "foto's"} bezig` : "";
+  $("#meta").textContent = PR.datum ? `Prijzen ${fmtDate(parseDate(PR.datum))}` : (CAT.ready ? "Geen prijzen" : "");
+  drawPct();
+  const feed = $("#feed"); const keep = new Set(); const nodes = [];
+  let html = !CAT.ready ? (S.loadError ? `<div class="notice"><b>De kaartendatabase kon niet laden.</b> Ververs de pagina.</div>` : `<div class="notice">Kaartendatabase laden…</div>`) : bannerHtml();
+  if (CAT.ready && !scans.length) html += emptyHtml();
+  if (bannerEl.dataset.h !== html) { bannerEl.innerHTML = html; bannerEl.dataset.h = html; }
+  if (!CAT.ready) scans.length = 0;
+  for (const s of scans) {
+    const ks = (s.kaarten || []).filter(k => S.filter === "all" || k.st !== "ok");
+    if (S.filter === "check" && !ks.length && !["lezen", "nummers", "wacht", "fout", "offline"].includes(s.status)) continue;
+    const openHere = S.open && (s.kaarten || []).some(k => k.k === S.open) ? S.open : "";
+    const sig = [s.id, s._v || 0, s.status, ks.length, pct(), S.filter, openHere, PR.datum, JSON.stringify(s.kaarten.map(k => [k.st, k.sid, k.lid, k.rev, k.eigen]))].join("~");
+    let g = groupCache.get(s.id);
+    if (!g || g.sig !== sig) { const el = document.createElement("section"); el.className = "scan"; el.innerHTML = scanHtml(s, ks); g = { sig, el }; groupCache.set(s.id, g); }
+    keep.add(s.id); nodes.push(g.el);
+  }
+  for (const id of groupCache.keys()) if (!keep.has(id)) groupCache.delete(id);
+  const want = [bannerEl, ...nodes];
+  want.forEach((node, i) => { if (feed.children[i] !== node) feed.insertBefore(node, feed.children[i] || null); });
+  while (feed.children.length > want.length) feed.lastElementChild.remove();
+  S.fresh.clear();
+}
+function bannerHtml() {
+  const notes = [];
+  if (S.boot && !S.sample) notes.push(`<div class="notice"><b>Scannen werkt alleen in de Claude app of op claude.ai.</b> Open deze pagina daar om foto's te laten lezen.</div>`);
+  if (S.boot && S.sample && S.limits && !S.limits.images) notes.push(`<div class="notice"><b>Foto's versturen is hier niet beschikbaar.</b> Open de pagina in de Claude app of op claude.ai.</div>`);
+  if (S.local) notes.push(`<div class="notice">Lijsten worden alleen op dit apparaat bewaard.</div>`);
+  return notes.join("");
+}
+function emptyHtml() {
+  return `<div class="empty"><div class="ghostgrid">${"<i></i>".repeat(9)}</div>
+    <h2>Scan je eerste binderpagina</h2>
+    <p>Fotografeer een pagina recht van boven. Elke kaart verschijnt hier met setcode, nummer, trendprijs en jouw bod.</p>
+    <p class="fine">Tip: maak eerst foto's van alle pagina's met je camera en kies ze daarna samen via Foto's.</p></div>`;
+}
+function statusPill(s) {
+  const c = (s.kaarten || []).filter(k => k.st !== "ok").length;
+  switch (s.status) {
+    case "wacht": return `<span class="pill busy"><span class="dot"></span>In de rij</span>`;
+    case "lezen": return `<span class="pill busy"><span class="dot"></span>Lezen</span>`;
+    case "nummers": return `<span class="pill busy"><span class="dot"></span>Nummers checken</span>`;
+    case "offline": return `<span class="pill warn">Wacht op verbinding</span>`;
+    case "fout": return `<span class="pill bad">Mislukt</span>`;
+    case "leeg": return `<span class="pill">Geen kaarten gevonden</span>`;
+    default: return c ? `<span class="pill warn">${c} controleren</span>` : `<span class="pill ok">Klaar</span>`;
+  }
+}
+function scanHtml(s, ks) {
+  const idx = allScans().filter(x => !x.hand).reverse().findIndex(x => x.id === s.id) + 1;
+  const title = s.hand ? "Handmatig toegevoegd" : `Foto ${idx}`;
+  const busy = ["wacht", "lezen", "nummers"].includes(s.status);
+  const sub = `${fmtTime(s.t)} · ${(s.kaarten || []).length} ${(s.kaarten || []).length === 1 ? "kaart" : "kaarten"}`;
+  let h = `<div class="scanhead">${s.foto ? `<img src="${s.foto}" alt="">` : `<span class="ph"></span>`}
+    <div class="t"><b>${title}</b><small>${sub}</small></div>${statusPill(s)}
+    <button class="iconbtn" data-act="scanmenu" data-s="${s.id}" aria-label="Opties voor ${title}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
+  if (s.err) h += `<div class="card"><span></span><div class="info fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
+  h += ks.map(k => cardHtml(s, k)).join("");
+  if (s.status === "lezen" && !(s.kaarten || []).length) h += `<div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
+  else if (busy && s.status === "lezen") h += `<div class="skel"></div>`;
+  return h;
+}
+function cardHtml(s, k) {
+  const { card, trend, bod } = priceOf(k);
+  const name = card ? card.name : (k.lez.name || "Onbekende kaart") + (k.lang ? ` (${k.lang})` : "");
+  const code = card ? `<span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span>` : `<span class="code">${esc(k.lez.number || "")}</span>`;
+  const tags = [];
+  if (k.st === "check") tags.push(`<span class="tag warn">Controleer versie</span>`);
+  if (k.st === "none") tags.push(`<span class="tag warn">${k.lang ? "Niet Engels" : "Niet gevonden"}</span>`);
+  if (k.rev) tags.push(`<span class="tag rev">Reverse</span>`);
+  if (card && k.st !== "none" && card.rar && !card.plain) tags.push(`<span class="tag">${esc(shortRar(card.rar))}</span>`);
+  if (k.lez.sticker) tags.push(`<span class="tag">Sticker ${esc(k.lez.sticker)}</span>`);
+  const own = Number.isFinite(k.eigen) && k.eigen !== null;
+  const price = bod != null ? `<b class="num">${EUR.format(bod)}</b><small class="num ${own ? "own" : ""}">${own ? "eigen " + EUR.format(k.eigen) : "trend " + EUR.format(trend)}</small>` : `<b class="num">€ ?</b><small>geen prijs</small>`;
+  const open = S.open === k.k;
+  let h = `<div class="card ${k.st !== "ok" ? k.st : ""} ${S.fresh.has(k.k) ? "fresh" : ""}" data-act="toggle" data-s="${s.id}" data-k="${k.k}" role="button" tabindex="0" aria-expanded="${open}">
+    ${k.thumb ? `<img class="thumb" src="${k.thumb}" alt="">` : `<span class="thumb"></span>`}
+    <div class="info"><b>${esc(name)}</b><div class="sub">${code}${tags.join("")}</div></div>
+    <div class="price">${price}</div>`;
+  if (open) h += detailHtml(s, k, card, own);
+  return h + `</div>`;
+}
+function shortRar(r) {
+  const m = { "special illustration rare": "SIR", "illustration rare": "IR", "ultra rare": "Full art", "hyper rare": "Gold", "secret rare": "Secret", "shiny rare": "Shiny", "shiny ultra rare": "Shiny full art", "promo": "Promo", "black white rare": "BW rare", "mega hyper rare": "Mega gold", "mega attack rare": "Mega attack" };
+  return m[r.toLowerCase()] || r;
+}
+function detailHtml(s, k, card, own) {
+  const alts = (k.alts || []).map(([sid, lid]) => CAT.byKey.get(sid + "|" + lid)).filter(Boolean);
+  const pid = card && pidOf(card);
+  let h = `<div class="detail" data-stop="1">`;
+  if (card) h += `<div class="fine">${esc(card.set.name)} · ${esc(card.rar || "")}${k.lez.name && norm(k.lez.name).join(" ") !== card.nn ? ` · gelezen als “${esc(k.lez.name)}”` : ""}</div>`;
+  if (alts.length) h += `<div class="lbl">Andere versies</div><div class="alts">${alts.map(a => `<button class="alt" data-act="pick" data-s="${s.id}" data-k="${k.k}" data-key="${esc(a.key)}">${esc(shortRar(a.rar || ""))} ${trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></button>`).join("")}</div>`;
+  h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div>`;
+  h += `<div class="actions">
+    ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="_blank" rel="noopener">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
+    <button class="btn" data-act="rev" data-s="${s.id}" data-k="${k.k}" aria-pressed="${k.rev}">Reverse</button>
+    <button class="btn" data-act="search" data-s="${s.id}" data-k="${k.k}">Andere kaart</button>
+    <button class="btn danger" data-act="del" data-s="${s.id}" data-k="${k.k}">Verwijder</button></div>`;
+  return h + `</div>`;
+}
+function drawPct() {
+  const row = $("#pctRow"); if (row.hidden) return;
+  const p = pct(); const opts = [40, 50, 60, 65, 70, 75, 80, 85, 90, 100];
+  if (row.dataset.p === String(p)) return; row.dataset.p = p;
+  row.innerHTML = opts.map(o => `<button class="chip num" data-pct="${o}" aria-pressed="${o === p}">${o}%</button>`).join("") +
+    `<input class="pctin num" id="pctIn" inputmode="numeric" aria-label="Eigen percentage" placeholder="anders" value="${opts.includes(p) ? "" : p}">`;
+}
+
+/* ---------------------------------------------------------------- interactie */
+let pctTimer = null;
+function setPct(v) {
+  v = Math.max(1, Math.min(200, Math.round(Number(v)))); if (!Number.isFinite(v)) return;
+  const l = listOf(); if (!l) return; const nl = { ...l, pct: v };
+  const i = S.lists.findIndex(x => x.id === l.id); S.lists[i] = nl; $("#pctRow").dataset.p = ""; render();
+  clearTimeout(pctTimer); pctTimer = setTimeout(() => putList(nl).catch(() => toast("Percentage opslaan mislukt")), 500);
+}
+document.addEventListener("click", e => {
+  const pc = e.target.closest("[data-pct]"); if (pc) { setPct(pc.dataset.pct); return; }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  if (e.target.closest("[data-stop]") && a.dataset.act === "toggle") return;
+  const act = a.dataset.act, sId = a.dataset.s, key = a.dataset.k;
+  if (act === "toggle") { if (e.target.closest("a, input, button:not([data-act='toggle'])")) return; S.open = S.open === key ? null : key; render(); }
+  else if (act === "pick") { const card = CAT.byKey.get(a.dataset.key); editCard(sId, key, k => { const old = k.sid ? [k.sid, k.lid] : null; k.alts = (k.alts || []).filter(x => x[0] + "|" + x[1] !== card.key); if (old) k.alts.unshift(old); k.sid = card.sid; k.lid = card.lid; k.st = "ok"; }); }
+  else if (act === "rev") editCard(sId, key, k => { k.rev = !k.rev; });
+  else if (act === "del") { S.open = null; editCard(sId, key, k => { k._del = true; }); }
+  else if (act === "clearown") editCard(sId, key, k => { k.eigen = null; });
+  else if (act === "search") openSearch(sId, key);
+  else if (act === "retry") { const s = scanById(sId); if (s) retryScan(s, "quick"); }
+  else if (act === "scanmenu") openScanMenu(sId);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.matches("[data-act='own']")) e.target.blur();
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".card[data-act='toggle']")) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.matches("[data-act='own']")) {
+    const v = parseFloat(String(t.value).replace(/[^\d,.-]/g, "").replace(",", "."));
+    editCard(t.dataset.s, t.dataset.k, k => { k.eigen = Number.isFinite(v) && v >= 0 ? round2(v) : null; });
+  } else if (t.id === "pctIn" && t.value) setPct(t.value);
+  else if (t.id === "pickCamera" || t.id === "pickGallery") { addFiles(t.files); t.value = ""; }
+});
+$("#pctBtn").addEventListener("click", () => { const r = $("#pctRow"); r.hidden = !r.hidden; $("#pctBtn").setAttribute("aria-expanded", String(!r.hidden)); r.dataset.p = ""; drawPct(); });
+$("#tabAll").addEventListener("click", () => { S.filter = "all"; $("#tabAll").setAttribute("aria-pressed", "true"); $("#tabCheck").setAttribute("aria-pressed", "false"); render(); });
+$("#tabCheck").addEventListener("click", () => { S.filter = "check"; $("#tabAll").setAttribute("aria-pressed", "false"); $("#tabCheck").setAttribute("aria-pressed", "true"); render(); });
+$("#listBtn").addEventListener("click", openLists);
+$("#menuBtn").addEventListener("click", openMenu);
+
+/* vellen */
+function sheet(html, onClick) {
+  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div>${html}</div></div>`;
+  const el = host.firstElementChild;
+  el.addEventListener("click", e => { if (e.target === el) close(); else onClick && onClick(e, close); });
+  function close() { host.innerHTML = ""; }
+  return { el, close };
+}
+function openLists() {
+  const items = S.lists.map(l => `<button class="item ${l.id === S.listId ? "on" : ""}" data-l="${l.id}"><span class="t"><b>${esc(l.naam)}</b><small>${fmtDate(new Date(l.t))} · bod ${l.pct || 70}%</small></span></button>`).join("");
+  const sh = sheet(`<h3>Lijsten</h3>
+    <div class="row"><input class="field" id="newName" placeholder="Naam, bijv. Beurs ${fmtDate(new Date())} Utrecht" style="flex:1;min-width:0"><button class="btn primary" data-x="new">Nieuwe lijst</button></div>
+    ${items || `<p class="fine">Nog geen lijsten.</p>`}
+    ${listOf() ? `<div class="row"><input class="field" id="rename" value="${esc(listOf().naam)}" style="flex:1;min-width:0" aria-label="Naam van deze lijst"><button class="btn" data-x="rename">Hernoem</button></div>
+    <button class="btn danger" data-x="delask">Lijst verwijderen</button><div id="delConfirm"></div>` : ""}`,
+    async (e, close) => {
+      const it = e.target.closest("[data-l]"); if (it) { selectList(it.dataset.l); close(); return; }
+      const x = e.target.closest("[data-x]"); if (!x) return;
+      if (x.dataset.x === "new") { await newList($("#newName").value.trim() || undefined); close(); }
+      else if (x.dataset.x === "rename") { const l = listOf(); const v = $("#rename").value.trim(); if (l && v) await putList({ ...l, naam: v }); close(); render(); }
+      else if (x.dataset.x === "delask") $("#delConfirm").innerHTML = `<div class="notice">Alle scans in deze lijst verdwijnen. <button class="btn danger" data-x="del">Ja, verwijder</button></div>`;
+      else if (x.dataset.x === "del") { await deleteList(); close(); }
+    });
+}
+async function deleteList() {
+  const l = listOf(); if (!l) return;
+  for (const s of allScans()) await deleteScanDoc(s).catch(() => {});
+  if (S.db) await S.db.doc("lijsten/" + l.id).delete().catch(() => {});
+  S.lists = S.lists.filter(x => x.id !== l.id); saveLocal();
+  S.listId = null; const next = S.lists[0]; if (next) selectList(next.id); else render();
+  toast("Lijst verwijderd");
+}
+function openMenu() {
+  sheet(`<h3>${esc(listOf() ? listOf().naam : "Kaartscan")}</h3>
+    <button class="item" data-m="sheet"><span class="t"><b>Naar Google Sheet</b><small>Nieuw tabblad in je Kaartpricer sheet</small></span></button>
+    <button class="item" data-m="copy"><span class="t"><b>Kopieer lijst</b><small>Als tabel om te plakken</small></span></button>
+    <button class="item" data-m="add"><span class="t"><b>Kaart toevoegen</b><small>Zoek op naam en nummer</small></span></button>
+    <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
+    <p class="fine">Trend is de Cardmarket trendprijs ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) : ""}. Dat is niet de laagste NL NM aanbieding: tik een kaart aan en open Cardmarket om die te zien.</p>`,
+    (e, close) => {
+      const m = e.target.closest("[data-m]"); if (!m) return; close();
+      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else openLists();
+    });
+}
+function openScanMenu(sId) {
+  const s = scanById(sId); if (!s) return; const hasBm = S.bitmaps.has(sId);
+  sheet(`<h3>${s.hand ? "Handmatig toegevoegd" : "Foto " + fmtTime(s.t)}</h3>
+    ${hasBm ? `<button class="item" data-m="acc"><span class="t"><b>Opnieuw lezen, nauwkeurig</b><small>Langzamer, beter bij twijfel of slechte foto</small></span></button>
+    <button class="item" data-m="again"><span class="t"><b>Opnieuw lezen</b><small>Snel</small></span></button>` : ""}
+    <button class="item" data-m="del"><span class="t"><b>Verwijder deze foto</b><small>Met alle ${(s.kaarten || []).length} kaarten</small></span></button>`,
+    async (e, close) => {
+      const m = e.target.closest("[data-m]"); if (!m) return; close();
+      if (m.dataset.m === "acc") retryScan(s, "default"); else if (m.dataset.m === "again") retryScan(s, "quick");
+      else { await deleteScanDoc(s).catch(() => toast("Verwijderen mislukt")); render(); }
+    });
+}
+function searchCards(q) {
+  const tok = norm(q); if (!tok.length) return [];
+  const nums = tok.filter(t => /\d/.test(t)), words = tok.filter(t => !/^\d+$/.test(t));
+  const res = [];
+  for (const c of CAT.cards) {
+    if (words.length && !words.every(w => c.nn.includes(w) || (c.set.code || "").toLowerCase() === w)) continue;
+    if (nums.length && !nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid)) continue;
+    res.push(c); if (res.length > 400) break;
+  }
+  return res.sort((a, b) => (b.set.rel || "").localeCompare(a.set.rel || "")).slice(0, 40);
+}
+function openSearch(sId, key) {
+  const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
+  const sh = sheet(`<h3>${k0 ? "Kies de juiste kaart" : "Kaart toevoegen"}</h3>
+    <input class="field" id="q" placeholder="Naam en eventueel nummer, bijv. mew ex 205" value="${esc(k0 ? k0.lez.name : "")}" autocomplete="off">
+    <div id="res" style="display:grid;gap:8px"></div>`,
+    async (e, close) => {
+      const it = e.target.closest("[data-key]"); if (!it) return;
+      const card = CAT.byKey.get(it.dataset.key); close();
+      if (k0) editCard(sId, key, k => { k.sid = card.sid; k.lid = card.lid; k.st = "ok"; });
+      else addManual(card);
+    });
+  const q = $("#q", sh.el), res = $("#res", sh.el);
+  const run = () => { res.innerHTML = searchCards(q.value).map(c => `<button class="item" data-key="${esc(c.key)}"><span class="t"><b>${esc(c.name)}</b><small>${esc(c.set.name)} · <span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span> · ${esc(shortRar(c.rar || ""))}</small></span><span class="num fine">${trendOf(c) ? EUR.format(trendOf(c)) : ""}</span></button>`).join("") || `<p class="fine">Typ een naam, eventueel met nummer.</p>`; };
+  q.addEventListener("input", run); run(); setTimeout(() => q.focus(), 50);
+}
+async function addManual(card) {
+  const list = await ensureList();
+  let s = allScans().find(x => x.hand);
+  const k = { k: uid(), box: null, lez: { name: card.name, number: card.lid }, st: "ok", sid: card.sid, lid: card.lid, alts: [], rev: false, eigen: null, thumb: null };
+  if (s) { s = { ...s, kaarten: [k, ...s.kaarten], n: s.kaarten.length + 1, t: Date.now(), _v: (s._v || 0) + 1 }; }
+  else s = { id: uid(), list: list.id, t: Date.now(), status: "klaar", hand: true, kaarten: [k], foto: null, n: 1, _v: 1 };
+  S.fresh.add(k.k); S.scans.set(s.id, s); render();
+  try { await putScan(s); } catch { toast("Opslaan mislukt"); }
+}
+
+/* exporteren */
+function rows() {
+  const out = [["Naam", "Set", "Nummer", "Trend", "Eigen prijs", `Bod ${pct()}%`, "Cardmarket (NL, NM)"]];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
+    const { card, trend, bod } = priceOf(k);
+    out.push([card ? card.name + (k.rev ? " (reverse)" : "") : (k.lez.name || "?"), card ? `${card.set.name} (${codeOf(card)})` : "", card ? "'" + numOf(card, k.lez.number) : "",
+      trend ?? "", k.eigen ?? "", bod ?? "", card && pidOf(card) ? cmLink(pidOf(card)) : ""]);
+  }
+  return out;
+}
+async function copyList() {
+  const txt = rows().map(r => r.map(v => String(v).replace(/^'/, "").replace(/\./g, typeof v === "number" ? "," : ".")).join("\t")).join("\n");
+  try { await navigator.clipboard.writeText(txt); toast("Lijst gekopieerd"); }
+  catch { sheet(`<h3>Kopieer lijst</h3><textarea class="field" style="height:50vh;padding:10px" readonly>${esc(txt)}</textarea>`); }
+}
+async function toSheet() {
+  if (!S.mcp) { toast("Google Sheets is niet beschikbaar in deze weergave"); return; }
+  const data = rows(); if (data.length < 2) { toast("Nog geen kaarten om te versturen"); return; }
+  const base = (listOf() ? listOf().naam : "Kaartscan").replace(/[\[\]*?:\/\\']/g, " ").slice(0, 80);
+  toast("Naar Google Sheet sturen…");
+  let title = base;
+  try {
+    try { await S.mcp.callTool("Google Sheets", "update_spreadsheet", { spreadsheetId: SHEET_ID, requests: [{ addSheet: { properties: { title, index: 0 } } }] }); }
+    catch (e) {
+      if (e && e.code === "tool_error") { title = `${base} ${fmtTime(Date.now()).replace(":", ".")}`; await S.mcp.callTool("Google Sheets", "update_spreadsheet", { spreadsheetId: SHEET_ID, requests: [{ addSheet: { properties: { title, index: 0 } } }] }); }
+      else throw e;
+    }
+    await S.mcp.callTool("Google Sheets", "update_values", { spreadsheetId: SHEET_ID, range: `'${title}'!A1:G${data.length}`, values: data });
+    toast(`In je sheet gezet, tabblad ${title}`);
+  } catch (e) {
+    const c = e && e.code;
+    const msg = c === "needs_reauth" ? "Koppel Google Sheets opnieuw in claude.ai bij Instellingen, Connectors"
+      : c === "server_not_connected" ? "Voeg Google Sheets toe in claude.ai bij Instellingen, Connectors"
+      : c === "not_in_manifest" || c === "approval_required" ? "Google Sheets heeft nog geen toestemming voor deze pagina. Probeer opnieuw en sta het toe"
+      : c === "server_unavailable" || c === "upstream_error" ? "Google Sheets reageert niet. Kijk in je sheet of het tabblad er al staat voor je het opnieuw probeert"
+      : "Naar Google Sheet sturen mislukt" + (e && e.message ? ": " + String(e.message).slice(0, 120) : "");
+    toast(msg, 6000);
+  }
+}
+let toastT = null;
+function toast(msg, ms = 3200) { const h = $("#toastHost"); h.innerHTML = `<div class="toast">${esc(msg)}</div>`; clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms); }
+
+/* ---------------------------------------------------------------- start */
+async function boot() {
+  render();
+  const cl = window.claude && typeof window.claude.use === "function" ? window.claude : null;
+  const [db, sample, mcp] = await Promise.all([
+    cl ? cl.use("db").catch(() => null) : null, cl ? cl.use("sample").catch(() => null) : null, cl ? cl.use("mcp").catch(() => null) : null,
+    loadData().catch(() => { S.loadError = true; }),
+  ]);
+  S.db = db; S.sample = sample; S.mcp = mcp; S.boot = true;
+  if (sample && sample.limits) S.limits = await sample.limits().catch(() => null);
+  if (db) watchLists();
+  else { S.local = true; loadLocal(); const want = (() => { try { return localStorage.getItem("kaartscan.list"); } catch { return null; } })(); const l = S.lists.find(x => x.id === want) || S.lists[0]; if (l) S.listId = l.id; }
+  render();
+}
+boot();
+</script>
