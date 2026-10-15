@@ -547,6 +547,7 @@ async function runJob(job) {
     const need = s.kaarten.filter(k => k.st !== "ok" && k.box && !k.lang);
     if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need, job.tier); }
     s.status = "klaar"; s.n = s.kaarten.length; s._v++; render();
+    await shrinkKept(s.id, bm);
     await persist(s);
   } catch (e) {
     if (e && e.code === "cancelled") return;
@@ -578,9 +579,16 @@ async function persist(s) {
   try { await putScan(s); if (!S.db) { S.live.delete(s.id); render(); } }
   catch (e) { s.err = "Opslaan mislukt. De kaarten blijven zichtbaar tot je de pagina sluit."; s._v++; render(); }
 }
+async function shrinkKept(id, bm) {          // volle resolutie is alleen nodig tijdens het lezen; daarna een kleinere kopie voor opnieuw lezen
+  const f = Math.min(1, 2400 / Math.max(bm.width, bm.height)); if (f >= 1) return;
+  try {
+    const c = canvasOf(bm.width * f, bm.height * f); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+    const small = await createImageBitmap(c); if (S.bitmaps.get(id) === bm) { S.bitmaps.set(id, small); try { bm.close(); } catch {} }
+  } catch {}
+}
 function keepBitmap(id, bm) {
   S.bitmaps.set(id, bm);
-  while (S.bitmaps.size > 6) { const [old, b] = S.bitmaps.entries().next().value; try { b.close(); } catch {} S.bitmaps.delete(old); }
+  while (S.bitmaps.size > 4) { const [old, b] = S.bitmaps.entries().next().value; try { b.close(); } catch {} S.bitmaps.delete(old); }
 }
 function retryScan(s, tier) {
   const bm = S.bitmaps.get(s.id); const job = s.retryJob || null;
