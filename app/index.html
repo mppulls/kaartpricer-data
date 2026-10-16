@@ -110,8 +110,12 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 @keyframes pulse { 50% { opacity: .25; } }
 .linkbtn { color: var(--accent); font-weight: 600; font-size: 13px; padding: 4px 2px; }
 
-.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); position: relative; }
-.card:first-child { border-top: 0; }
+.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; position: relative; background: var(--surface); touch-action: pan-y; }
+.swipe { position: relative; background: var(--bad); border-top: 1px solid var(--line); overflow: hidden; }
+.scanhead + .swipe { border-top: 0; }
+.swipe-lbl { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; font-size: 14px; opacity: .55; transition: opacity .15s; }
+.swipe.armed .swipe-lbl { opacity: 1; }
+.errrow { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--line); }
 .card.check::before, .card.none::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--warn); }
 .card.none::before { background: var(--bad); }
 .card.fresh { animation: fresh 2.4s ease-out; }
@@ -147,7 +151,7 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 
 /* scanbalk */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-top: 18px; }
-.dock .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.dock .wrap { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
 .side { height: 48px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14px; }
 .queue { justify-self: end; font-size: 12px; color: var(--muted); text-align: right; }
 .fab { position: relative; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; isolation: isolate; }
@@ -172,7 +176,26 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .field { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
 .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
-.lowbtn { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 6px; }
+.lowbtn { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 5px; }
+.buybtn { justify-self: end; height: 48px; padding: 0 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); display: inline-grid; text-align: left; line-height: 1.15; }
+.buybtn b { font-size: 14px; } .buybtn small { font-size: 12px; color: var(--muted); }
+.buybtn:disabled { opacity: .45; }
+.qpill { position: absolute; left: 50%; transform: translateX(-50%); top: -10px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.qpill:empty { display: none; }
+.toast { display: flex; gap: 14px; align-items: center; width: max-content; }
+.toast span { min-width: 0; }
+.toastbtn { color: var(--accent-soft); font-weight: 700; white-space: nowrap; }
+.sumgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sumgrid div { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.sumgrid small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.sumgrid b { font-size: 17px; }
+.daycard { padding: 14px 12px; display: grid; gap: 12px; }
+.daycard .big { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.buyhead { cursor: pointer; }
+.buyrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.buyrow img, .buyrow .ph { width: 34px; height: 48px; border-radius: 4px; object-fit: cover; background: var(--surface-2); }
+.buyrow b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buyrow small { color: var(--muted); font-size: 12px; }
 .lowsheet { min-height: 70vh; }
 .lowhead { display: flex; align-items: center; gap: 10px; }
 .lowhead .prog { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
@@ -196,6 +219,7 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
       <button class="listbtn" id="listBtn" type="button" aria-label="Kies lijst"><span id="listName">Kaartscan</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
       <span class="spacer"></span>
+      <button class="lowbtn" id="lowBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Low</button>
       <button class="iconbtn" id="menuBtn" type="button" aria-label="Menu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
@@ -207,10 +231,10 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
     <div class="pctrow" id="pctRow" hidden></div>
     <div class="row1">
       <div class="tabs" role="group" aria-label="Filter">
-        <button class="tab" id="tabAll" type="button" aria-pressed="true">Alles</button>
-        <button class="tab" id="tabCheck" type="button" aria-pressed="false">Controleren<span class="cnt num" id="checkCnt"></span></button>
+        <button class="tab" id="tabAll" type="button" aria-pressed="true" data-filter="all">Lijst</button>
+        <button class="tab" id="tabCheck" type="button" aria-pressed="false" data-filter="check">Controleren<span class="cnt num" id="checkCnt"></span></button>
+        <button class="tab" id="tabBuy" type="button" aria-pressed="false" data-filter="buy">Inkopen<span class="cnt num" id="buyCnt" style="color:var(--accent)"></span></button>
       </div>
-      <button class="lowbtn" id="lowBtn" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Low checken</button>
     </div>
   </div>
 </header>
@@ -219,11 +243,12 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 
 <div class="dock">
   <div class="wrap">
+    <div class="qpill num" id="queue" aria-live="polite"></div>
     <label class="side" for="pickGallery">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg>Foto's</label>
     <label class="fab" for="pickCamera" aria-label="Scan met camera">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg></label>
-    <div class="queue num" id="queue" aria-live="polite"></div>
+    <button class="buybtn" id="buyBtn" type="button" disabled><b>Inkoop</b><small class="num" id="buySub">opslaan</small></button>
   </div>
   <input class="sr" type="file" id="pickCamera" accept="image/*" capture="environment">
   <input class="sr" type="file" id="pickGallery" accept="image/*" multiple>
@@ -421,7 +446,8 @@ function photoThumb(bm) { const s = 96 / Math.max(bm.width, bm.height); const c 
 
 /* ---------------------------------------------------------------- opslag */
 const S = { db: null, sample: null, mcp: null, limits: null, lists: [], listId: null, scans: new Map(), live: new Map(),
-  filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false };
+  filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false,
+  buys: [], unsubBuys: null, openBuy: null };
 const listOf = () => S.lists.find(l => l.id === S.listId) || null;
 const pct = () => { const l = listOf(); return l && Number.isFinite(l.pct) ? l.pct : 70; };
 const chains = new Map();
@@ -429,10 +455,10 @@ function serial(path, fn) { const p = (chains.get(path) || Promise.resolve()).th
 
 function saveLocal() {
   if (!S.local) return;
-  try { localStorage.setItem("kaartscan", JSON.stringify({ lists: S.lists, scans: [...S.scans.values()] })); } catch {}
+  try { localStorage.setItem("kaartscan", JSON.stringify({ lists: S.lists, scans: [...S.scans.values()], buys: S.buys })); } catch {}
 }
 function loadLocal() {
-  try { const j = JSON.parse(localStorage.getItem("kaartscan") || "null"); if (j) { S.lists = j.lists || []; (j.scans || []).forEach(s => S.scans.set(s.id, s)); } } catch {}
+  try { const j = JSON.parse(localStorage.getItem("kaartscan") || "null"); if (j) { S.lists = j.lists || []; (j.scans || []).forEach(s => S.scans.set(s.id, s)); S.buys = j.buys || []; } } catch {}
 }
 async function putList(l) {
   const i = S.lists.findIndex(x => x.id === l.id); if (i >= 0) S.lists[i] = l; else S.lists.unshift(l);
@@ -470,8 +496,9 @@ function watchLists() {
 }
 function selectList(id) {
   S.listId = id; try { localStorage.setItem("kaartscan.list", id); } catch {}
-  S.open = null; S.scans = new Map();
+  S.open = null; S.openBuy = null; S.scans = new Map(); if (!S.local) S.buys = [];
   if (S.unsubScans) { S.unsubScans(); S.unsubScans = null; }
+  if (S.unsubBuys) { S.unsubBuys(); S.unsubBuys = null; }
   if (S.db && id) {
     S.unsubScans = S.db.doc("lijsten/" + id).collection("scans").orderBy("t", "desc").limit(1000).onSnapshot(snap => {
       const m = new Map(); snap.docs.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
@@ -479,6 +506,9 @@ function selectList(id) {
       for (const [sid, l] of S.live) if (m.has(sid) && (l.status === "klaar" || l.status === "leeg")) S.live.delete(sid);
       render();
     }, e => toast("Scans laden lukt niet: " + (e && e.code || "fout")));
+    S.unsubBuys = S.db.doc("lijsten/" + id).collection("inkopen").orderBy("t", "desc").limit(500).onSnapshot(snap => {
+      S.buys = snap.docs.map(d => ({ id: d.id, list: id, ...d.data() })); render();
+    }, e => toast("Inkopen laden lukt niet: " + (e && e.code || "fout")));
   } else if (S.local) { loadLocal(); }
   render();
 }
@@ -621,19 +651,31 @@ function allScans() {
   return [...m.values()].filter(s => s.list === S.listId || !s.list).sort((a, b) => b.t - a.t);
 }
 function scanById(id) { return S.live.get(id) || S.scans.get(id); }
-async function editCard(scanId, key, fn) {
+async function mutateScan(scanId, fn) {
   const s = scanById(scanId); if (!s) return;
-  if (S.live.has(scanId) && s.status !== "klaar") {
-    const k = s.kaarten.find(x => x.k === key); if (!k) return; fn(k, s);
-    s.kaarten = s.kaarten.filter(x => !x._del); s._v++; render(); return;
-  }
+  if (S.live.has(scanId) && s.status !== "klaar") { fn(s); s.kaarten = s.kaarten.filter(x => !x._del); s._v++; render(); return; }
   const copy = { ...s, kaarten: s.kaarten.map(k => ({ ...k })) };
-  const k = copy.kaarten.find(x => x.k === key); if (!k) return;
-  fn(k, copy);
+  fn(copy);
   copy.kaarten = copy.kaarten.filter(x => !x._del); copy.n = copy.kaarten.length; copy._v = (s._v || 0) + 1;
+  if (!copy.kaarten.length && copy.status === "klaar") { S.live.delete(scanId); S.scans.delete(scanId); render(); await deleteScanDoc(copy).catch(() => {}); return; }
   if (S.live.has(scanId)) { S.live.set(scanId, copy); render(); if (copy.status === "klaar") await persist(copy); return; }
   S.scans.set(scanId, copy); render();
   try { await putScan(copy); } catch { toast("Opslaan mislukt, probeer het opnieuw"); }
+}
+function editCard(scanId, key, fn) { return mutateScan(scanId, s => { const k = s.kaarten.find(x => x.k === key); if (k) fn(k, s); }); }
+async function restoreScan(prev) {
+  const s = { ...prev, kaarten: prev.kaarten.map(k => ({ ...k })), _v: (prev._v || 0) + 7 };
+  if (S.live.has(s.id) && S.live.get(s.id).status !== "klaar") { S.live.set(s.id, s); render(); return; }
+  S.scans.set(s.id, s); render();
+  try { await putScan(s); } catch { toast("Terugzetten mislukt"); }
+}
+function deleteCard(scanId, key) {
+  const s = scanById(scanId); if (!s) return;
+  const prev = { ...s, kaarten: s.kaarten.map(k => ({ ...k })) };
+  const k = s.kaarten.find(x => x.k === key); const nm = k ? (priceOf(k).card || { name: k.lez.name }).name : "Kaart";
+  if (S.open === key) S.open = null;
+  editCard(scanId, key, k => { k._del = true; });
+  toast(`${nm} verwijderd`, 5000, { label: "Ongedaan maken", fn: () => restoreScan(prev) });
 }
 function priceOf(k) {
   const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
@@ -646,6 +688,7 @@ function priceOf(k) {
 /* ---------------------------------------------------------------- tekenen */
 let rendering = false;
 const bannerEl = document.createElement("div"); bannerEl.style.display = "grid"; bannerEl.style.gap = "14px";
+const buyEl = document.createElement("div"); buyEl.style.display = "grid"; buyEl.style.gap = "14px";
 document.addEventListener("animationend", e => { if (e.target.classList && e.target.classList.contains("fresh")) e.target.classList.remove("fresh"); });
 function render() { if (rendering) return; rendering = true; requestAnimationFrame(() => { rendering = false; draw(); }); }
 const groupCache = new Map();
@@ -659,11 +702,19 @@ function draw() {
   const waiting = S.queue.length + S.running;
   $("#queue").textContent = !navigator.onLine && [...S.live.values()].some(s => s.status === "offline") ? "Geen verbinding, foto's wachten" : waiting ? `${waiting} ${waiting === 1 ? "foto" : "foto's"} bezig` : "";
   $("#tDate").textContent = PR.datum ? fmtDate(parseDate(PR.datum)) : "";
+  const buys = listBuys(); $("#buyCnt").textContent = buys.length ? buys.length : "";
+  $("#buyBtn").disabled = !n; $("#buySub").textContent = n ? EUR.format(of) : "opslaan";
   drawPct();
   const feed = $("#feed"); const keep = new Set(); const nodes = [];
   let html = !CAT.ready ? (S.loadError ? `<div class="notice"><b>De kaartendatabase kon niet laden.</b> Ververs de pagina.</div>` : `<div class="notice">Kaartendatabase laden…</div>`) : bannerHtml();
-  if (CAT.ready && !scans.length) html += emptyHtml();
+  if (CAT.ready && !scans.length && S.filter !== "buy") html += emptyHtml();
   if (bannerEl.dataset.h !== html) { bannerEl.innerHTML = html; bannerEl.dataset.h = html; }
+  if (S.filter === "buy" && CAT.ready) {
+    const bh = buysHtml(); if (buyEl.dataset.h !== bh) { buyEl.innerHTML = bh; buyEl.dataset.h = bh; }
+    [bannerEl, buyEl].forEach((node, i) => { if (feed.children[i] !== node) feed.insertBefore(node, feed.children[i] || null); });
+    while (feed.children.length > 2) feed.lastElementChild.remove();
+    return;
+  }
   if (!CAT.ready) scans.length = 0;
   for (const s of scans) {
     const ks = (s.kaarten || []).filter(k => S.filter === "all" || k.st !== "ok");
@@ -713,7 +764,7 @@ function scanHtml(s, ks) {
   let h = `<div class="scanhead">${s.foto ? `<img src="${s.foto}" alt="">` : `<span class="ph"></span>`}
     <div class="t"><b>${title}</b><small>${sub}</small></div>${statusPill(s)}
     <button class="iconbtn" data-act="scanmenu" data-s="${s.id}" aria-label="Opties voor ${title}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
-  if (s.err) h += `<div class="card"><span></span><div class="info fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
+  if (s.err) h += `<div class="errrow"><div class="fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
   h += ks.map(k => cardHtml(s, k)).join("");
   if (s.status === "lezen" && !(s.kaarten || []).length) h += `<div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
   else if (busy && s.status === "lezen") h += `<div class="skel"></div>`;
@@ -733,12 +784,12 @@ function cardHtml(s, k) {
   const sub = src === "eigen" ? "eigen " + EUR.format(k.eigen) : src === "low" ? "low NL " + EUR.format(k.low) : "trend " + EUR.format(trend);
   const price = bod != null ? `<b class="num">${EUR.format(bod)}</b><small class="num ${src !== "trend" ? "own" : ""}">${sub}</small>` : `<b class="num">€ ?</b><small>geen prijs</small>`;
   const open = S.open === k.k;
-  let h = `<div class="card ${k.st !== "ok" ? k.st : ""} ${S.fresh.has(k.k) ? "fresh" : ""}" data-act="toggle" data-s="${s.id}" data-k="${k.k}" role="button" tabindex="0" aria-expanded="${open}">
+  let h = `<div class="swipe" data-s="${s.id}" data-k="${k.k}"><span class="swipe-lbl">Verwijder</span><div class="card ${k.st !== "ok" ? k.st : ""} ${S.fresh.has(k.k) ? "fresh" : ""}" data-act="toggle" data-s="${s.id}" data-k="${k.k}" role="button" tabindex="0" aria-expanded="${open}">
     ${k.thumb ? `<img class="thumb" src="${k.thumb}" alt="">` : `<span class="thumb"></span>`}
     <div class="info"><b>${esc(name)}</b><div class="sub">${code}${tags.join("")}</div></div>
     <div class="price">${price}</div>`;
   if (open) h += detailHtml(s, k, card, own);
-  return h + `</div>`;
+  return h + `</div></div>`;
 }
 function shortRar(r) {
   const m = { "special illustration rare": "SIR", "illustration rare": "IR", "ultra rare": "Full art", "hyper rare": "Gold", "secret rare": "Secret", "shiny rare": "Shiny", "shiny ultra rare": "Shiny full art", "promo": "Promo", "black white rare": "BW rare", "mega hyper rare": "Mega gold", "mega attack rare": "Mega attack" };
@@ -776,7 +827,9 @@ function setPct(v) {
   const i = S.lists.findIndex(x => x.id === l.id); S.lists[i] = nl; $("#pctRow").dataset.p = ""; render();
   clearTimeout(pctTimer); pctTimer = setTimeout(() => putList(nl).catch(() => toast("Percentage opslaan mislukt")), 500);
 }
+let swallowClick = false;
 document.addEventListener("click", e => {
+  if (swallowClick) { e.preventDefault(); e.stopPropagation(); return; }
   const pc = e.target.closest("[data-pct]"); if (pc) { setPct(pc.dataset.pct); return; }
   const a = e.target.closest("[data-act]"); if (!a) return;
   if (e.target.closest("[data-stop]") && a.dataset.act === "toggle") return;
@@ -784,7 +837,11 @@ document.addEventListener("click", e => {
   if (act === "toggle") { if (e.target.closest("a, input, button:not([data-act='toggle'])")) return; S.open = S.open === key ? null : key; render(); }
   else if (act === "pick") { const card = CAT.byKey.get(a.dataset.key); editCard(sId, key, k => { const old = k.sid ? [k.sid, k.lid] : null; k.alts = (k.alts || []).filter(x => x[0] + "|" + x[1] !== card.key); if (old) k.alts.unshift(old); k.sid = card.sid; k.lid = card.lid; k.st = "ok"; }); }
   else if (act === "rev") editCard(sId, key, k => { k.rev = !k.rev; });
-  else if (act === "del") { S.open = null; editCard(sId, key, k => { k._del = true; }); }
+  else if (act === "del") deleteCard(sId, key);
+  else if (act === "buyopen") { S.openBuy = S.openBuy === a.dataset.b ? null : a.dataset.b; render(); }
+  else if (act === "buydelask") { const box = document.getElementById("bd-" + a.dataset.b); if (box) box.innerHTML = `<div class="notice">Deze inkoop verdwijnt uit je overzicht. <button class="btn danger" data-act="buydel" data-b="${a.dataset.b}">Ja, verwijder</button></div>`; }
+  else if (act === "buydel") deleteBuy(a.dataset.b);
+  else if (act === "finish") openFinish();
   else if (act === "clearown") editCard(sId, key, k => { k.eigen = null; });
   else if (act === "search") openSearch(sId, key);
   else if (act === "retry") { const s = scanById(sId); if (s) retryScan(s, "quick"); }
@@ -806,8 +863,9 @@ document.addEventListener("change", e => {
   else if (t.id === "pickCamera" || t.id === "pickGallery") { addFiles(t.files); t.value = ""; }
 });
 $("#pctBtn").addEventListener("click", () => { const r = $("#pctRow"); r.hidden = !r.hidden; $("#pctBtn").setAttribute("aria-expanded", String(!r.hidden)); r.dataset.p = ""; drawPct(); });
-$("#tabAll").addEventListener("click", () => { S.filter = "all"; $("#tabAll").setAttribute("aria-pressed", "true"); $("#tabCheck").setAttribute("aria-pressed", "false"); render(); });
-$("#tabCheck").addEventListener("click", () => { S.filter = "check"; $("#tabAll").setAttribute("aria-pressed", "false"); $("#tabCheck").setAttribute("aria-pressed", "true"); render(); });
+function setFilter(f) { S.filter = f; document.querySelectorAll("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === f))); window.scrollTo({ top: 0 }); render(); }
+document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => setFilter(b.dataset.filter)));
+$("#buyBtn").addEventListener("click", () => openBuySheet());
 $("#listBtn").addEventListener("click", openLists);
 $("#lowBtn").addEventListener("click", () => openLow());
 $("#menuBtn").addEventListener("click", openMenu);
@@ -846,15 +904,17 @@ async function deleteList() {
 }
 function openMenu() {
   sheet(`<h3>${esc(listOf() ? listOf().naam : "Kaartscan")}</h3>
-    <button class="item" data-m="sheet"><span class="t"><b>Naar Google Sheet</b><small>Nieuw tabblad in je Kaartpricer sheet</small></span></button>
+    <button class="item" data-m="sheet"><span class="t"><b>Lijst naar Google Sheet</b><small>De kaarten die nu in je lijst staan</small></span></button>
     <button class="item" data-m="copy"><span class="t"><b>Kopieer lijst</b><small>Als tabel om te plakken</small></span></button>
+    <button class="item" data-m="buy"><span class="t"><b>Inkoop opslaan</b><small>De kaarten in je lijst als inkoop bewaren</small></span></button>
+    <button class="item" data-m="finish"><span class="t"><b>Dag afronden</b><small>Alle inkopen van vandaag naar je sheet</small></span></button>
     <button class="item" data-m="low"><span class="t"><b>Low checken</b><small>Loop je kaarten langs en vul de laagste NL prijs in</small></span></button>
     <button class="item" data-m="add"><span class="t"><b>Kaart toevoegen</b><small>Zoek op naam en nummer</small></span></button>
     <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
     <p class="fine">Trend is de Cardmarket trendprijs ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) : ""}. Je bod rekent met je eigen prijs, anders je CM low NL, anders de trend. Dat is niet de laagste NL NM aanbieding: tik een kaart aan en open Cardmarket om die te zien.</p>`,
     (e, close) => {
       const m = e.target.closest("[data-m]"); if (!m) return; close();
-      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "low") openLow(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else openLists();
+      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "buy") openBuySheet(); else if (m.dataset.m === "finish") openFinish(); else if (m.dataset.m === "low") openLow(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else openLists();
     });
 }
 function openScanMenu(sId) {
@@ -986,6 +1046,154 @@ document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id
 const refocusLow = () => { if (document.visibilityState === "visible" && LOW.run) { const i = $("#lowIn"); if (i && !i.value) setTimeout(() => i.focus(), 120); } };
 document.addEventListener("visibilitychange", refocusLow); window.addEventListener("focus", refocusLow);
 
+/* inkopen */
+const listBuys = () => S.buys.filter(b => !b.list || b.list === S.listId).sort((a, b) => b.t - a.t);
+function busyScans() { return allScans().some(s => ["wacht", "lezen", "nummers"].includes(s.status)); }
+function activeCards() {
+  const out = [];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
+    const p = priceOf(k);
+    out.push({ naam: p.card ? p.card.name : (k.lez.name || "Onbekende kaart"), set: p.card ? p.card.set.name : "", code: p.card ? codeOf(p.card) : "",
+      nr: p.card ? numOf(p.card, k.lez.number) : (k.lez.number || ""), pid: p.card ? pidOf(p.card) : null, rev: !!k.rev,
+      trend: p.trend ?? null, low: Number.isFinite(k.low) ? k.low : null, eigen: Number.isFinite(k.eigen) ? k.eigen : null,
+      basis: p.base ?? null, bod: p.bod ?? null, thumb: k.thumb || null });
+  }
+  return out;
+}
+function allocate(cards, paid) {        // betaald bedrag naar rato van de waarde per kaart, voor je administratie
+  const known = cards.map(c => c.basis).filter(v => v > 0); const avg = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+  const w = cards.map(c => c.basis > 0 ? c.basis : avg); const sum = w.reduce((a, b) => a + b, 0) || 1;
+  let total = 0; cards.forEach((c, i) => { c.inkoop = round2(paid * w[i] / sum); total += c.inkoop; });
+  const diff = round2(paid - total); if (diff && cards.length) { let mi = 0; w.forEach((x, i) => { if (x > w[mi]) mi = i; }); cards[mi].inkoop = round2(cards[mi].inkoop + diff); }
+}
+async function putBuy(b) {
+  const body = stripId(b);
+  if (JSON.stringify(body).length > 200000) body.kaarten = body.kaarten.map(c => ({ ...c, thumb: null }));
+  if (S.db) await serial(`lijsten/${b.list}/inkopen/${b.id}`, () => S.db.doc(`lijsten/${b.list}/inkopen/${b.id}`).set(body));
+  else { S.buys = S.buys.filter(x => x.id !== b.id).concat([b]); saveLocal(); }
+}
+async function deleteBuy(id) {
+  const b = S.buys.find(x => x.id === id); if (!b) return;
+  if (S.db) await serial(`lijsten/${b.list}/inkopen/${id}`, () => S.db.doc(`lijsten/${b.list}/inkopen/${id}`).delete()).catch(() => toast("Verwijderen mislukt"));
+  S.buys = S.buys.filter(x => x.id !== id); saveLocal(); S.openBuy = null; render(); toast(`Inkoop ${b.nr} verwijderd`);
+}
+function openBuySheet() {
+  const cards = activeCards(); if (!cards.length) { toast("Er staan geen kaarten in je lijst"); return; }
+  if (busyScans()) { toast("Wacht tot alle foto's gelezen zijn"); return; }
+  const tr = cards.reduce((a, c) => a + (c.trend || 0), 0), bod = round2(cards.reduce((a, c) => a + (c.bod || 0), 0));
+  let via = (() => { try { return localStorage.getItem("kaartscan.via") || ""; } catch { return ""; } })();
+  sheet(`<h3>Inkoop opslaan</h3>
+    <div class="sumgrid"><div><small>Kaarten</small><b class="num">${cards.length}</b></div><div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div><div><small>Bod ${pct()}%</small><b class="num">${EUR.format(bod)}</b></div></div>
+    <label class="lbl" for="buyPaid">Betaald</label>
+    <input class="bigin" id="buyPaid" inputmode="decimal" value="${String(bod.toFixed(2)).replace(".", ",")}" autocomplete="off">
+    <label class="lbl" for="buySeller">Verkoper, optioneel</label>
+    <input class="field" id="buySeller" placeholder="Naam of standnummer" autocomplete="off">
+    <div class="lbl">Betaald via</div>
+    <div class="chips" id="viaChips">${["Contant", "Tikkie", "Pin", "Ruil"].map(v => `<button class="chip" data-via="${v}" aria-pressed="${v === via}">${v}</button>`).join("")}</div>
+    <button class="btn primary wide" data-b="save">Inkoop opslaan</button>
+    <button class="btn wide" data-b="clearask">Lijst leegmaken zonder inkoop</button><div id="clearConfirm"></div>`,
+    async (e, close) => {
+      const v = e.target.closest("[data-via]");
+      if (v) { via = via === v.dataset.via ? "" : v.dataset.via; document.querySelectorAll("[data-via]").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.via === via))); try { localStorage.setItem("kaartscan.via", via); } catch {} return; }
+      const b = e.target.closest("[data-b]"); if (!b) return;
+      if (b.dataset.b === "save") {
+        const paid = parseMoney($("#buyPaid").value); if (paid == null) { toast("Vul het betaalde bedrag in"); return; }
+        b.disabled = true; await saveBuy(paid, $("#buySeller").value.trim(), via); close();
+      } else if (b.dataset.b === "clearask") $("#clearConfirm").innerHTML = `<div class="notice">Alle kaarten in je lijst verdwijnen, zonder inkoop. <button class="btn danger" data-b="clear">Ja, leegmaken</button></div>`;
+      else if (b.dataset.b === "clear") { close(); await clearActive(); toast("Lijst leeggemaakt"); }
+    });
+}
+async function clearActive() { for (const s of allScans()) await deleteScanDoc(s).catch(() => {}); S.open = null; render(); }
+async function saveBuy(paid, seller, via) {
+  const list = await ensureList(); const cards = activeCards(); allocate(cards, paid);
+  const nr = Math.max(0, ...listBuys().map(b => b.nr || 0)) + 1;
+  const b = { id: uid(), list: list.id, t: Date.now(), nr, verkoper: seller || "", via: via || "", betaald: paid, pct: pct(), n: cards.length,
+    trend: round2(cards.reduce((a, c) => a + (c.trend || 0), 0)), basis: round2(cards.reduce((a, c) => a + (c.basis || 0), 0)), kaarten: cards };
+  try { await putBuy(b); } catch { toast("Inkoop opslaan mislukt, je lijst is niet aangepast", 5000); return; }
+  if (S.db) S.buys = [b, ...S.buys.filter(x => x.id !== b.id)];
+  await clearActive();
+  toast(`Inkoop ${nr} opgeslagen, ${EUR.format(paid)} voor ${cards.length} ${cards.length === 1 ? "kaart" : "kaarten"}`, 4500);
+}
+function buysHtml() {
+  const buys = listBuys(); const list = listOf();
+  if (!buys.length) return `<div class="empty"><h2>Nog geen inkopen</h2><p>Scan de kaarten, veeg weg wat je niet koopt en tik onderin op Inkoop. Hier zie je daarna al je inkopen van de dag.</p></div>`;
+  const paid = buys.reduce((a, b) => a + (b.betaald || 0), 0), n = buys.reduce((a, b) => a + (b.n || 0), 0), tr = buys.reduce((a, b) => a + (b.trend || 0), 0);
+  let h = `<section class="scan daycard"><div><small class="lbl">Uitgegeven</small><div class="big num">${EUR.format(paid)}</div></div>
+    <div class="sumgrid"><div><small>Inkopen</small><b class="num">${buys.length}</b></div><div><small>Kaarten</small><b class="num">${n}</b></div><div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div></div>
+    <button class="btn primary wide" data-act="finish">Dag afronden en naar Sheet</button>
+    ${list && list.afgerond ? `<p class="fine">Afgerond om ${fmtTime(list.afgerond)} en naar je sheet gestuurd. Komen er nog inkopen bij, rond dan opnieuw af.</p>` : ""}</section>`;
+  for (const b of buys) {
+    const open = S.openBuy === b.id;
+    h += `<section class="scan"><div class="scanhead buyhead" data-act="buyopen" data-b="${b.id}" role="button" tabindex="0" aria-expanded="${open}">
+      <div class="t"><b>Inkoop ${b.nr}${b.verkoper ? " · " + esc(b.verkoper) : ""}</b><small>${fmtTime(b.t)} · ${b.n} ${b.n === 1 ? "kaart" : "kaarten"}${b.via ? " · " + esc(b.via) : ""}</small></div>
+      <div class="price"><b class="num">${EUR.format(b.betaald || 0)}</b><small class="num">trend ${EUR.format(b.trend || 0)}</small></div></div>`;
+    if (open) {
+      h += (b.kaarten || []).map(c => `<div class="buyrow">${c.thumb ? `<img src="${c.thumb}" alt="">` : `<span class="ph"></span>`}
+        <div style="min-width:0"><b>${esc(c.naam)}${c.rev ? " (reverse)" : ""}</b><small><span class="code">${esc(c.code)} ${esc(c.nr)}</span>${c.trend ? " · trend " + EUR.format(c.trend) : ""}</small></div>
+        <div class="price"><b class="num">${EUR.format(c.inkoop || 0)}</b><small>inkoop</small></div></div>`).join("");
+      h += `<div class="errrow"><span class="fine">Inkoop per kaart is het betaalde bedrag verdeeld naar waarde.</span><button class="linkbtn" style="color:var(--bad)" data-act="buydelask" data-b="${b.id}">Verwijder</button></div><div id="bd-${b.id}" style="padding:0 12px 12px"></div>`;
+    }
+    h += `</section>`;
+  }
+  return h;
+}
+function dayRows() {
+  const buys = listBuys().slice().reverse();
+  const out = [["Inkoop", "Tijd", "Verkoper", "Betaald via", "Naam", "Set", "Nummer", "Trend", "CM low NL", "Eigen prijs", "Inkoopprijs", "Cardmarket (NL, NM)"]];
+  for (const b of buys) for (const c of b.kaarten || [])
+    out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", c.naam + (c.rev ? " (reverse)" : ""), c.set ? `${c.set} (${c.code})` : "", c.nr ? "'" + c.nr : "",
+      c.trend ?? "", c.low ?? "", c.eigen ?? "", c.inkoop ?? "", c.pid ? cmLink(c.pid) : ""]);
+  out.push([]);
+  out.push(["Inkoop", "Tijd", "Verkoper", "Betaald via", "Kaarten", "Trend totaal", "Betaald"]);
+  for (const b of buys) out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", b.n, b.trend || 0, b.betaald || 0]);
+  out.push(["Totaal", "", "", "", buys.reduce((a, b) => a + (b.n || 0), 0), round2(buys.reduce((a, b) => a + (b.trend || 0), 0)), round2(buys.reduce((a, b) => a + (b.betaald || 0), 0))]);
+  return out;
+}
+function openFinish() {
+  const buys = listBuys(); if (!buys.length) { toast("Nog geen inkopen om af te ronden"); return; }
+  const paid = buys.reduce((a, b) => a + (b.betaald || 0), 0), n = buys.reduce((a, b) => a + (b.n || 0), 0);
+  const left = activeCards().length;
+  sheet(`<h3>Dag afronden</h3>
+    <div class="sumgrid"><div><small>Inkopen</small><b class="num">${buys.length}</b></div><div><small>Kaarten</small><b class="num">${n}</b></div><div><small>Uitgegeven</small><b class="num">${EUR.format(paid)}</b></div></div>
+    ${left ? `<div class="notice"><b>Er staan nog ${left} kaarten in je lijst die niet zijn ingekocht.</b> Die gaan niet mee naar de sheet.</div>` : ""}
+    <p class="fine">Er komt een nieuw tabblad in je Kaartpricer sheet met elke ingekochte kaart, de inkoopprijs per kaart en onderaan de totalen per inkoop.</p>
+    <button class="btn primary wide" data-f="sheet">Naar Google Sheet</button>
+    <button class="btn wide" data-f="copy">Kopieer overzicht</button>`,
+    async (e, close) => {
+      const f = e.target.closest("[data-f]"); if (!f) return;
+      if (f.dataset.f === "copy") { copyRows(dayRows(), "Overzicht gekopieerd"); return; }
+      f.disabled = true;
+      const title = await sheetWrite(`${listOf() ? listOf().naam : "Beurs"} inkopen`, dayRows());
+      f.disabled = false;
+      if (title) { const l = listOf(); if (l) await putList({ ...l, afgerond: Date.now() }).catch(() => {}); close(); render(); }
+    });
+}
+
+/* vegen om te verwijderen */
+let sw = null;
+document.addEventListener("touchstart", e => {
+  const card = e.target.closest(".swipe > .card");
+  if (!card || e.touches.length !== 1 || card.querySelector(".detail") || e.target.closest("input, a, button")) { sw = null; return; }
+  sw = { card, wrap: card.parentElement, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, on: false };
+}, { passive: true });
+document.addEventListener("touchmove", e => {
+  if (!sw) return; const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+  if (!sw.on) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+    if (dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.3) { sw.on = true; sw.card.style.transition = "none"; } else return;
+  }
+  e.preventDefault(); sw.dx = Math.min(0, dx); sw.card.style.transform = `translateX(${sw.dx}px)`;
+  sw.wrap.classList.toggle("armed", -sw.dx > Math.min(110, sw.wrap.offsetWidth * 0.3));
+}, { passive: false });
+function endSwipe() {
+  if (!sw) return; const s = sw; sw = null; if (!s.on) return;
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 350);
+  s.card.style.transition = "transform .18s ease";
+  if (-s.dx > Math.min(110, s.wrap.offsetWidth * 0.3)) { s.card.style.transform = "translateX(-105%)"; setTimeout(() => deleteCard(s.wrap.dataset.s, s.wrap.dataset.k), 170); }
+  else { s.card.style.transform = ""; s.wrap.classList.remove("armed"); }
+}
+document.addEventListener("touchend", endSwipe); document.addEventListener("touchcancel", endSwipe);
+
 /* exporteren */
 function rows() {
   const out = [["Naam", "Set", "Nummer", "Trend", "CM low NL", "Eigen prijs", `Bod ${pct()}%`, "Cardmarket (NL, NM)"]];
@@ -996,15 +1204,21 @@ function rows() {
   }
   return out;
 }
-async function copyList() {
-  const txt = rows().map(r => r.map(v => String(v).replace(/^'/, "").replace(/\./g, typeof v === "number" ? "," : ".")).join("\t")).join("\n");
-  try { await navigator.clipboard.writeText(txt); toast("Lijst gekopieerd"); }
-  catch { sheet(`<h3>Kopieer lijst</h3><textarea class="field" style="height:50vh;padding:10px" readonly>${esc(txt)}</textarea>`); }
+async function copyRows(data, done) {
+  const txt = data.map(r => r.map(v => typeof v === "number" ? String(v).replace(".", ",") : String(v).replace(/^'/, "")).join("\t")).join("\n");
+  try { await navigator.clipboard.writeText(txt); toast(done); }
+  catch { sheet(`<h3>Kopieer</h3><textarea class="field" style="height:50vh;padding:10px" readonly>${esc(txt)}</textarea>`); }
 }
+const copyList = () => copyRows(rows(), "Lijst gekopieerd");
 async function toSheet() {
-  if (!S.mcp) { toast("Google Sheets is niet beschikbaar in deze weergave"); return; }
   const data = rows(); if (data.length < 2) { toast("Nog geen kaarten om te versturen"); return; }
-  const base = (listOf() ? listOf().naam : "Kaartscan").replace(/[\[\]*?:\/\\']/g, " ").slice(0, 80);
+  await sheetWrite(listOf() ? listOf().naam : "Kaartscan", data);
+}
+const colName = n => { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+async function sheetWrite(name, data) {
+  if (!S.mcp) { toast("Google Sheets is niet beschikbaar in deze weergave"); return null; }
+  const base = String(name).replace(/[\[\]*?:\/\\']/g, " ").slice(0, 80);
+  const width = Math.max(...data.map(r => r.length));
   toast("Naar Google Sheet sturen…");
   let title = base;
   try {
@@ -1013,8 +1227,9 @@ async function toSheet() {
       if (e && e.code === "tool_error") { title = `${base} ${fmtTime(Date.now()).replace(":", ".")}`; await S.mcp.callTool("Google Sheets", "update_spreadsheet", { spreadsheetId: SHEET_ID, requests: [{ addSheet: { properties: { title, index: 0 } } }] }); }
       else throw e;
     }
-    await S.mcp.callTool("Google Sheets", "update_values", { spreadsheetId: SHEET_ID, range: `'${title}'!A1:H${data.length}`, values: data });
-    toast(`In je sheet gezet, tabblad ${title}`);
+    await S.mcp.callTool("Google Sheets", "update_values", { spreadsheetId: SHEET_ID, range: `'${title}'!A1:${colName(width)}${data.length}`, values: data.map(r => r.length ? r : [""]) });
+    toast(`In je sheet gezet, tabblad ${title}`, 4500);
+    return title;
   } catch (e) {
     const c = e && e.code;
     const msg = c === "needs_reauth" ? "Koppel Google Sheets opnieuw in claude.ai bij Instellingen, Connectors"
@@ -1023,10 +1238,15 @@ async function toSheet() {
       : c === "server_unavailable" || c === "upstream_error" ? "Google Sheets reageert niet. Kijk in je sheet of het tabblad er al staat voor je het opnieuw probeert"
       : "Naar Google Sheet sturen mislukt" + (e && e.message ? ": " + String(e.message).slice(0, 120) : "");
     toast(msg, 6000);
+    return null;
   }
 }
 let toastT = null;
-function toast(msg, ms = 3200) { const h = $("#toastHost"); h.innerHTML = `<div class="toast">${esc(msg)}</div>`; clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms); }
+function toast(msg, ms = 3200, action) {
+  const h = $("#toastHost"); h.innerHTML = `<div class="toast"><span>${esc(msg)}</span>${action ? `<button class="toastbtn" id="toastAct" type="button">${esc(action.label)}</button>` : ""}</div>`;
+  if (action) $("#toastAct").addEventListener("click", () => { h.innerHTML = ""; action.fn(); });
+  clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms);
+}
 
 /* ---------------------------------------------------------------- start */
 async function boot() {

@@ -13,6 +13,7 @@ Gereedschap en data voor de kaartpricer skill van MP Collectibles.
 De branch `data` wordt elke dag overschreven zonder geschiedenis, zo blijft de repo klein.
 * `app/index.html`: de scan app (claude.ai artifact "MP Kaartscan"). `build/app_data.py` maakt er `catalog.json` en `prices.json` bij;
   een geplande Claude taak zet die elke ochtend in de app.
+  Opslag in de artifact database: `lijsten/<id>` (naam, pct, afgerond), `lijsten/<id>/scans` (werklijst) en `lijsten/<id>/inkopen` (opgeslagen inkopen met kaarten, betaald bedrag en inkoopprijs per kaart).
 
 Handmatig verversen: tabblad Actions, workflow "data", Run workflow.
 
