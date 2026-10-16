@@ -2,7 +2,7 @@ name: data
 # Elke ochtend: verse kaartencatalogus (TCGdex) en de prijslijst van Cardmarket naar de branch "data".
 on:
   schedule:
-    - cron: "15 4 * * *"
+    - cron: "30 1 * * *"
   workflow_dispatch:
   push:
     branches: [main]
