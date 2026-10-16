@@ -754,7 +754,7 @@ function detailHtml(s, k, card, own) {
   h += `<div class="own"><label class="lbl" for="low-${k.k}">CM low NL</label><input id="low-${k.k}" inputmode="decimal" placeholder="bijv. 3,20" value="${hasLow ? String(k.low).replace(".", ",") : ""}" data-act="low" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${hasLow && k.lowT ? `<span class="fine">${fmtTime(k.lowT)}</span>` : ""}</div>`;
   h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div>`;
   h += `<div class="actions">
-    ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="_blank" rel="noopener">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
+    ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="cardmarket">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
     <button class="btn" data-act="rev" data-s="${s.id}" data-k="${k.k}" aria-pressed="${k.rev}">Reverse</button>
     <button class="btn" data-act="search" data-s="${s.id}" data-k="${k.k}">Andere kaart</button>
     <button class="btn danger" data-act="del" data-s="${s.id}" data-k="${k.k}">Verwijder</button></div>`;
@@ -953,7 +953,7 @@ function drawLow(el) {
     <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : `<span class="ph"></span>`}
       <div><b>${esc(card.name)}${k.rev ? " (reverse)" : ""}</b><span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span> <span class="tag">${esc(shortRar(card.rar || ""))}</span>
       <div class="fine">${esc(card.set.name)}</div><div class="fine num">Trend ${t ? EUR.format(t) : "onbekend"}${Number.isFinite(k.low) && k.low !== null ? ` · vorige low ${EUR.format(k.low)}` : ""}</div></div></div>
-    <a class="btn primary wide" href="${link}" target="_blank" rel="noopener" data-low="opened">Open Cardmarket NL NM
+    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">Open Cardmarket NL NM
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
     <label class="lbl" for="lowIn">Laagste prijs NL NM</label>
     <input class="bigin" id="lowIn" inputmode="decimal" enterkeyhint="next" placeholder="0,00" autocomplete="off" value="">
