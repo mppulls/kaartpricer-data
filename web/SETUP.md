@@ -41,10 +41,11 @@ Reken op ongeveer 20 minuten, achter je laptop. Alles hieronder doe je één kee
 
 1. Open `https://<naam van je project>.pages.dev`.
 2. Vul de teamcode in. Je blijft een jaar ingelogd.
-3. In Safari: Delen, Zet op beginscherm.
-4. Eenmalig: menu, Lijsten uit Claude importeren.
+3. Kies wie je bent (Mees of Plien). Iedereen heeft eigen lijsten, inkopen en dag afronden.
+4. In Safari: Delen, Zet op beginscherm. Open de app vanaf het beginscherm en kies daar nog één keer je naam.
+5. Alleen Mees, eenmalig: menu, Lijsten uit Claude importeren. Die lijsten worden van Mees.
 
-Je partner doet stap 1 tot en met 3 op haar eigen telefoon. Jullie zien elkaars scans en inkopen binnen een paar seconden.
+Plien doet stap 1 tot en met 4 op haar eigen telefoon. Elkaars lijsten zie je onder Lijsten, bij "Van Mees" of "Van Plien".
 
 ## Goed om te weten
 

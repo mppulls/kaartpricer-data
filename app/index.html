@@ -501,6 +501,40 @@ const S = { db: null, sample: null, mcp: null, limits: null, lists: [], listId: 
   filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false,
   buys: [], unsubBuys: null, openBuy: null };
 const listOf = () => S.lists.find(l => l.id === S.listId) || null;
+/* wie gebruikt deze telefoon: iedereen eigen lijsten, inkopen en afronden; lijsten zonder eigenaar zijn van iedereen */
+const ME = { name: (() => { try { return localStorage.getItem("kaartscan.wie") || ""; } catch { return ""; } })() };
+const NAMES = ["Mees", "Plien"];
+const mine = l => !l.door || !ME.name || l.door === ME.name;
+const ownerOf = l => l && l.door && l.door !== ME.name ? l.door : "";
+function pickDefaultList() {
+  let want = null; try { want = localStorage.getItem("kaartscan.list"); } catch {}
+  const w = S.lists.find(l => l.id === want);
+  return (w && mine(w) ? w : null) || S.lists.find(l => ME.name && l.door === ME.name) || S.lists.find(mine) || null;
+}
+function setMe(name) {
+  ME.name = name; try { localStorage.setItem("kaartscan.wie", name); } catch {}
+  const l = listOf(); if (l && !mine(l)) { const p = pickDefaultList(); if (p) selectList(p.id); else clearSelection(); }
+  else if (!l) { const p = pickDefaultList(); if (p) selectList(p.id); }
+  render();
+}
+function clearSelection() {
+  S.listId = null; S.open = null; S.openBuy = null; S.scans = new Map(); if (!S.local) S.buys = [];
+  if (S.unsubScans) { S.unsubScans(); S.unsubScans = null; } if (S.unsubBuys) { S.unsubBuys(); S.unsubBuys = null; }
+  try { localStorage.removeItem("kaartscan.list"); } catch {}
+  if (S.local) loadLocal();          // lokaal staan alle lijsten in één opslag, die niet kwijtraken
+}
+function openWho(then) {
+  const known = [...new Set([...NAMES, ...S.lists.map(l => l.door).filter(Boolean)])];
+  const sh = sheet(`<h3>Wie gebruikt deze telefoon?</h3>
+    <p class="fine" style="margin:0">Iedereen heeft eigen lijsten, inkopen en dag afronden. Elkaars lijsten kun je wel openen via Lijsten.</p>
+    <div class="chips">${known.map(n => `<button class="chip" data-who="${esc(n)}" aria-pressed="${n === ME.name}">${esc(n)}</button>`).join("")}</div>
+    <div class="row"><input class="field" id="whoIn" placeholder="Andere naam" autocomplete="off" style="flex:1;min-width:0"><button class="btn" data-who-in="1">Kies</button></div>`,
+    (e, close) => {
+      const c = e.target.closest("[data-who]"), i = e.target.closest("[data-who-in]");
+      const n = c ? c.dataset.who : i ? $("#whoIn", sh.el).value.trim().slice(0, 24) : ""; if (!n) return;
+      close(); setMe(n); toast(`Je bent ${n} op deze telefoon`); if (then) then();
+    });
+}
 const pct = () => { const l = listOf(); return l && Number.isFinite(l.pct) ? l.pct : 70; };
 const chains = new Map();
 function serial(path, fn) { const p = (chains.get(path) || Promise.resolve()).then(fn, fn); chains.set(path, p.catch(() => {})); return p; }
@@ -539,9 +573,8 @@ function watchLists() {
   S.db.collection("lijsten").orderBy("t", "desc").limit(200).onSnapshot(snap => {
     S.lists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (!S.listId || !S.lists.some(l => l.id === S.listId)) {
-      let want = null; try { want = localStorage.getItem("kaartscan.list"); } catch {}
-      const pick = S.lists.find(l => l.id === want) || S.lists[0];
-      if (pick) selectList(pick.id);
+      const pick = pickDefaultList();
+      if (pick) selectList(pick.id); else if (S.listId) clearSelection();
     }
     render();
   }, e => toast("Lijsten laden lukt niet: " + (e && e.code || "fout")));
@@ -565,7 +598,7 @@ function selectList(id) {
   render();
 }
 async function newList(name) {
-  const now = new Date(); const l = { id: uid(), naam: name || `Beurs ${fmtDate(now)}`, t: Date.now(), pct: pct() };
+  const now = new Date(); const l = { id: uid(), naam: name || `Beurs ${fmtDate(now)}`, t: Date.now(), pct: pct(), door: ME.name || null };
   await putList(l); selectList(l.id); return l;
 }
 async function ensureList() { if (!listOf()) await newList(); return listOf(); }
@@ -762,7 +795,7 @@ function render() { if (rendering) return; rendering = true; requestAnimationFra
 const groupCache = new Map();
 function draw() {
   const list = listOf(); const scans = allScans();
-  $("#listName").textContent = list ? list.naam : "Kaartscan";
+  $("#listName").textContent = list ? list.naam + (ownerOf(list) ? " · " + ownerOf(list) : "") : "Kaartscan";
   let n = 0, tr = 0, of = 0, chk = 0;
   for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k, s); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (k.st !== "ok") chk++; }
   $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of);
@@ -1011,15 +1044,20 @@ function sheet(html, onClick, opts = {}) {
   return { el, close };
 }
 function openLists() {
-  const items = S.lists.map(l => `<button class="item ${l.id === S.listId ? "on" : ""}" data-l="${l.id}"><span class="t"><b>${esc(l.naam)}</b><small>${fmtDate(new Date(l.t))} · bod ${l.pct || 70}%</small></span></button>`).join("");
-  const sh = sheet(`<h3>Lijsten</h3>
+  const item = l => `<button class="item ${l.id === S.listId ? "on" : ""}" data-l="${l.id}"><span class="t"><b>${esc(l.naam)}</b><small>${fmtDate(new Date(l.t))} · bod ${l.pct || 70}%${l.afgerond ? " · afgerond" : ""}</small></span></button>`;
+  const own = S.lists.filter(mine), others = new Map();
+  S.lists.filter(l => !mine(l)).forEach(l => { if (!others.has(l.door)) others.set(l.door, []); others.get(l.door).push(l); });
+  const sh = sheet(`<h3>${ME.name ? "Lijsten van " + esc(ME.name) : "Lijsten"}</h3>
     <div class="row"><input class="field" id="newName" placeholder="Naam, bijv. Beurs ${fmtDate(new Date())} Utrecht" style="flex:1;min-width:0"><button class="btn primary" data-x="new">Nieuwe lijst</button></div>
-    ${items || `<p class="fine">Nog geen lijsten.</p>`}
+    ${own.map(item).join("") || `<p class="fine">Nog geen eigen lijsten. Je eerste scan maakt er vanzelf een.</p>`}
     ${listOf() ? `<div class="row"><input class="field" id="rename" value="${esc(listOf().naam)}" style="flex:1;min-width:0" aria-label="Naam van deze lijst"><button class="btn" data-x="rename">Hernoem</button></div>
-    <button class="btn danger" data-x="delask">Lijst verwijderen</button><div id="delConfirm"></div>` : ""}`,
+    <button class="btn danger" data-x="delask">Lijst verwijderen</button><div id="delConfirm"></div>` : ""}
+    ${[...others].map(([who, ls]) => `<div class="lbl" style="margin-top:6px">Van ${esc(who)}</div>${ls.slice(0, 6).map(item).join("")}`).join("")}
+    <div class="errrow" style="padding:6px 0 0;border:0"><span class="fine">${ME.name ? "Op deze telefoon ben je " + esc(ME.name) : "Nog niet gekozen wie je bent"}</span><button class="linkbtn" data-x="who">${ME.name ? "Wissel" : "Kies"}</button></div>`,
     async (e, close) => {
       const it = e.target.closest("[data-l]"); if (it) { selectList(it.dataset.l); close(); return; }
       const x = e.target.closest("[data-x]"); if (!x) return;
+      if (x.dataset.x === "who") { openWho(); return; }
       if (x.dataset.x === "new") { await newList($("#newName").value.trim() || undefined); close(); }
       else if (x.dataset.x === "rename") { const l = listOf(); const v = $("#rename").value.trim(); if (l && v) await putList({ ...l, naam: v }); close(); render(); }
       else if (x.dataset.x === "delask") $("#delConfirm").innerHTML = `<div class="notice">Alle scans in deze lijst verdwijnen. <button class="btn danger" data-x="del">Ja, verwijder</button></div>`;
@@ -1031,7 +1069,7 @@ async function deleteList() {
   for (const s of allScans()) await deleteScanDoc(s).catch(() => {});
   if (S.db) await S.db.doc("lijsten/" + l.id).delete().catch(() => {});
   S.lists = S.lists.filter(x => x.id !== l.id); saveLocal();
-  S.listId = null; const next = S.lists[0]; if (next) selectList(next.id); else render();
+  clearSelection(); const next = pickDefaultList(); if (next) selectList(next.id); else render();
   toast("Lijst verwijderd");
 }
 function openMenu() {
@@ -1344,7 +1382,8 @@ function openFinish() {
       const f = e.target.closest("[data-f]"); if (!f) return;
       if (f.dataset.f === "copy") { copyRows(dayRows(), "Overzicht gekopieerd"); return; }
       f.disabled = true;
-      const title = await sheetWrite(`${listOf() ? listOf().naam : "Beurs"} inkopen`, dayRows());
+      const l0 = listOf(), who = (l0 && l0.door) || ME.name;
+      const title = await sheetWrite(`${l0 ? l0.naam : "Beurs"} inkopen${who ? " " + who : ""}`, dayRows());
       f.disabled = false;
       if (title) { const l = listOf(); if (l) await putList({ ...l, afgerond: Date.now() }).catch(() => {}); close(); render(); }
     });
@@ -1394,7 +1433,8 @@ async function copyRows(data, done) {
 const copyList = () => copyRows(rows(), "Lijst gekopieerd");
 async function toSheet() {
   const data = rows(); if (data.length < 2) { toast("Nog geen kaarten om te versturen"); return; }
-  await sheetWrite(listOf() ? listOf().naam : "Kaartscan", data);
+  const l = listOf(), who = (l && l.door) || ME.name;
+  await sheetWrite((l ? l.naam : "Kaartscan") + (who ? " " + who : ""), data);
 }
 const colName = n => { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
 async function sheetWrite(name, data) {
@@ -1461,10 +1501,16 @@ async function importSeed() {
   if (!S.db) { toast("Opslag niet beschikbaar"); return; }
   const r = await fetch("/seed.json", { cache: "no-store" }).catch(() => null);
   if (!r || !r.ok) { toast("Er staat niets klaar om te importeren"); return; }
-  const j = await r.json(); let n = 0;
+  if (!ME.name) { openWho(importSeed); return; }
+  const j = await r.json(); let n = 0, skip = 0;
+  const have = new Set(S.lists.map(l => l.id));        // al aanwezige lijsten niet overschrijven, ook niet als iemand anders nog eens importeert
   toast("Importeren…", 60000);
-  for (const d of j.docs || []) { try { await S.db.doc(d.path).set(d.data); n++; } catch {} }
-  toast(`${n} onderdelen geïmporteerd`, 4000);
+  for (const d of j.docs || []) {
+    const parts = String(d.path).split("/"); if (have.has(parts[1])) { skip++; continue; }
+    const data = parts.length === 2 ? { ...d.data, door: d.data.door || ME.name } : d.data;
+    try { await S.db.doc(d.path).set(data); n++; } catch {}
+  }
+  toast(n ? `${n} onderdelen geïmporteerd als lijsten van ${ME.name}` : skip ? "Die lijsten staan er al" : "Niets geïmporteerd", 4000);
 }
 
 /* ---------------------------------------------------------------- start */
@@ -1478,8 +1524,9 @@ async function boot() {
   S.db = db; S.sample = sample; S.mcp = mcp; S.boot = true;
   if (sample && sample.limits) S.limits = await sample.limits().catch(() => null);
   if (db) watchLists();
-  else { S.local = true; loadLocal(); const want = (() => { try { return localStorage.getItem("kaartscan.list"); } catch { return null; } })(); const l = S.lists.find(x => x.id === want) || S.lists[0]; if (l) S.listId = l.id; }
+  else { S.local = true; loadLocal(); const l = pickDefaultList(); if (l) S.listId = l.id; }
   render();
+  if (!ME.name && (db || STANDALONE)) setTimeout(() => { if (!ME.name && !$("#sheetHost").innerHTML) openWho(); }, 600);
 }
 boot();
 </script>
