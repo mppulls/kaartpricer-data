@@ -46,6 +46,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body {
   background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.35;
@@ -59,49 +60,50 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .code { font-family: var(--f-code); font-size: 12px; letter-spacing: .02em; }
 .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
-/* kop */
-.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
-.top .wrap { padding-block: 10px 12px; display: grid; gap: 10px; }
-.row1 { display: flex; align-items: center; gap: 8px; }
-.listbtn { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
+/* kop: lijstnaam, één bedrag en alleen de knoppen die er nu toe doen */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); }
+.top .wrap { padding-block: 8px 12px; display: grid; gap: 10px; }
+.row1 { display: flex; align-items: center; gap: 4px; }
+.listbtn { display: flex; align-items: center; gap: 4px; min-width: 0; font-weight: 600; font-size: 16px; color: var(--muted); }
 .listbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.listbtn svg { flex: none; color: var(--muted); }
+.listbtn svg { flex: none; }
 .spacer { flex: 1; }
 .iconbtn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
 .iconbtn:active { background: var(--surface-2); }
-.stats { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: end; }
-.stat small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
-.stat b { font-size: 17px; font-weight: 600; }
-.stat.offer b { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
-.stat.offer { text-align: right; }
-.pctbtn { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; vertical-align: 2px; }
+.sum { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.sumleft { display: grid; gap: 2px; }
+.sumleft b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.05; }
+.pctbtn { justify-self: start; display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pctbtn span { color: var(--accent); }
+.sumright { display: grid; gap: 2px; text-align: right; font-size: 13px; color: var(--muted); padding-bottom: 3px; }
+.sumright b { color: var(--ink); font-weight: 600; }
 .pctrow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .pctrow::-webkit-scrollbar { display: none; }
 .chip { flex: none; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .pctin { flex: none; width: 76px; height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-weight: 600; }
-.tabs { display: flex; gap: 6px; }
-.tab { height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.tab[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
-.tab .cnt { color: var(--warn); margin-left: 4px; }
-.meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex: 1; text-align: right; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.fchip { flex: none; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--ink); border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 5px; }
+.fchip.warn { color: var(--warn); border-color: transparent; background: var(--warn-soft); }
+.fchip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
 /* feed */
-main .wrap { padding-block: 14px; display: grid; gap: 14px; }
+main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .notice { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; font-size: 14px; color: var(--muted); }
 .notice b { color: var(--ink); }
-.empty { text-align: center; padding: 48px 12px 24px; display: grid; gap: 10px; justify-items: center; }
+.empty { text-align: center; padding: 56px 12px 24px; display: grid; gap: 8px; justify-items: center; }
 .empty h2 { margin: 0; font-size: 20px; text-wrap: balance; }
 .empty p { margin: 0; color: var(--muted); max-width: 34ch; }
 .ghostgrid { display: grid; grid-template-columns: repeat(3, 34px); gap: 6px; margin-bottom: 8px; }
 .ghostgrid i { height: 46px; border-radius: 5px; border: 1.5px dashed var(--line); }
-.scan { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
-.scanhead { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-.scanhead img, .scanhead .ph { width: 30px; height: 40px; border-radius: 5px; object-fit: cover; background: var(--surface-2); flex: none; }
-.scanhead .t { min-width: 0; flex: 1; }
-.scanhead .t b { display: block; font-size: 14px; }
-.scanhead .t small { color: var(--muted); font-size: 12px; }
-.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.scan { background: var(--surface); border-radius: var(--r); overflow: hidden; box-shadow: 0 1px 2px rgba(17, 20, 27, .05); }
+.scanhead { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 14px; min-height: 40px; }
+.scanhead .cap { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scanhead .iconbtn { width: 34px; height: 34px; color: var(--muted); }
+.daycard .scanhead, .buyhead { padding: 12px 14px; }
+.buyhead .t { flex: 1; min-width: 0; } .buyhead .t b { display: block; font-size: 15px; } .buyhead .t small { color: var(--muted); font-size: 12px; }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
 .pill.busy { background: var(--accent-soft); color: var(--accent); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
 .pill.ok { color: var(--ok); }
@@ -110,7 +112,7 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 @keyframes pulse { 50% { opacity: .25; } }
 .linkbtn { color: var(--accent); font-weight: 600; font-size: 13px; padding: 4px 2px; }
 
-.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; position: relative; background: var(--surface); touch-action: pan-y; }
+.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; position: relative; background: var(--surface); touch-action: pan-y; }
 .swipe { position: relative; background: var(--bad); border-top: 1px solid var(--line); overflow: hidden; }
 .scanhead + .swipe { border-top: 0; }
 .swipe-lbl { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; font-size: 14px; opacity: .55; transition: opacity .15s; }
@@ -119,16 +121,17 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .card.check::before, .card.none::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--warn); }
 .card.none::before { background: var(--bad); }
 .card.fresh { animation: fresh 2.4s ease-out; }
-@keyframes fresh { 0% { background: var(--new); } 100% { background: transparent; } }
+@keyframes fresh { 0% { background: var(--new); } 100% { background: var(--surface); } }
 .thumb { width: 40px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
 .info { min-width: 0; }
 .info b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.info .sub { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 2px; flex-wrap: wrap; }
+.info .sub { display: flex; gap: 6px; align-items: baseline; color: var(--muted); font-size: 12.5px; margin-top: 3px; white-space: nowrap; overflow: hidden; }
+.info .sub .warn { color: var(--warn); font-weight: 600; } .info .sub .bad { color: var(--bad); font-weight: 600; } .info .sub .rev { color: var(--accent); font-weight: 600; }
 .tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
 .tag.warn { background: var(--warn-soft); color: var(--warn); }
 .tag.rev { background: var(--accent-soft); color: var(--accent); }
-.price { text-align: right; }
-.price b { display: block; font-size: 17px; font-weight: 700; }
+.price { text-align: right; white-space: nowrap; }
+.price b { display: block; font-size: 16px; font-weight: 700; }
 .price small { color: var(--muted); font-size: 12px; }
 .price small.own { color: var(--accent); font-weight: 600; }
 .skel { height: 56px; margin: 10px 12px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-2), var(--bg), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
@@ -140,19 +143,21 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .alt { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; text-align: left; }
 .alt .code { display: block; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.btn { height: 38px; padding: 0 14px; border-radius: 11px; background: var(--surface-2); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); }
+.btn { height: 38px; padding: 0 13px; border-radius: 11px; background: var(--surface-2); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); }
 .btn.danger { color: var(--bad); }
 .btn:disabled { opacity: .45; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-.own { display: flex; gap: 8px; align-items: center; }
-.own input { width: 110px; height: 38px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-weight: 600; }
+.prices2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.own { display: grid; gap: 4px; }
+.own input { width: 100%; height: 40px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-weight: 600; font-size: 16px; }
+.own .fine { font-size: 11px; }
 .fine { font-size: 12px; color: var(--muted); }
 
 /* scanbalk */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-top: 18px; }
 .dock .wrap { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
-.side { height: 48px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.side { justify-self: start; width: 52px; height: 52px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--ink); }
 .queue { justify-self: end; font-size: 12px; color: var(--muted); text-align: right; }
 .fab { position: relative; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; isolation: isolate; }
 .fab::before { content: ""; position: absolute; inset: 0; border-radius: 50%; z-index: -2;
@@ -179,7 +184,7 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
 .lowbtn { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 5px; }
-.buybtn { justify-self: end; height: 48px; padding: 0 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); display: inline-grid; text-align: left; line-height: 1.15; }
+.buybtn { justify-self: end; height: 52px; padding: 0 16px; border-radius: 26px; background: var(--surface); box-shadow: var(--shadow); display: inline-grid; text-align: left; line-height: 1.15; }
 .buybtn b { font-size: 14px; } .buybtn small { font-size: 12px; color: var(--muted); }
 .buybtn:disabled { opacity: .45; }
 .qpill { position: absolute; left: 50%; transform: translateX(-50%); top: -10px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
@@ -247,39 +252,40 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
   <div class="wrap">
     <div class="row1">
       <button class="listbtn" id="listBtn" type="button" aria-label="Kies lijst"><span id="listName">Kaartscan</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
       <span class="spacer"></span>
       <button class="iconbtn" id="searchBtn" type="button" aria-label="Zoek een kaart"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-      <button class="lowbtn" id="lowBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Low</button>
       <button class="iconbtn" id="menuBtn" type="button" aria-label="Menu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
-    <div class="stats">
-      <div class="stat"><small>Kaarten</small><b class="num" id="sCount">0</b></div>
-      <div class="stat"><small>Trend <span id="tDate"></span></small><b class="num" id="sTrend">€ 0,00</b></div>
-      <div class="stat offer"><small>Bod <button class="pctbtn" id="pctBtn" type="button" aria-expanded="false"><span id="pctLbl">70%</span></button></small><b class="num" id="sOffer">€ 0,00</b></div>
+    <div class="sum">
+      <div class="sumleft">
+        <button class="pctbtn" id="pctBtn" type="button" aria-expanded="false">Bod <span id="pctLbl">70%</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <b class="num" id="sOffer">€ 0,00</b>
+      </div>
+      <div class="sumright num"><span><b id="sCount">0</b> kaarten</span><span>trend <b id="sTrend">€ 0,00</b></span><span id="tDate" hidden></span></div>
     </div>
     <div class="pctrow" id="pctRow" hidden></div>
-    <div class="row1">
-      <div class="tabs" role="group" aria-label="Filter">
-        <button class="tab" id="tabAll" type="button" aria-pressed="true" data-filter="all">Lijst</button>
-        <button class="tab" id="tabCheck" type="button" aria-pressed="false" data-filter="check">Controleren<span class="cnt num" id="checkCnt"></span></button>
-        <button class="tab" id="tabBuy" type="button" aria-pressed="false" data-filter="buy">Inkopen<span class="cnt num" id="buyCnt" style="color:var(--accent)"></span></button>
-      </div>
+    <div class="chips" id="chips" hidden>
+      <button class="fchip" id="tabAll" type="button" data-filter="all" aria-pressed="true" hidden>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Lijst</button>
+      <button class="fchip warn" id="tabCheck" type="button" data-filter="check" aria-pressed="false" hidden><span class="num" id="checkCnt"></span> controleren</button>
+      <button class="fchip" id="lowBtn" type="button" hidden>Low checken</button>
+      <button class="fchip" id="tabBuy" type="button" data-filter="buy" aria-pressed="false" hidden>Inkopen <span class="num" id="buyCnt"></span></button>
     </div>
   </div>
-</header>
+</header></header>
 
 <main><div class="wrap" id="feed"></div></main>
 
 <div class="dock">
   <div class="wrap">
     <div class="qpill num" id="queue" aria-live="polite"></div>
-    <label class="side" for="pickGallery">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg>Foto's</label>
+    <label class="side" for="pickGallery" aria-label="Foto's kiezen uit je galerij">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg></label>
     <label class="fab" for="pickCamera" aria-label="Scan met camera">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg></label>
-    <button class="buybtn" id="buyBtn" type="button" disabled><b>Inkoop</b><small class="num" id="buySub">opslaan</small></button>
+    <button class="buybtn" id="buyBtn" type="button" hidden><b>Inkoop</b><small class="num" id="buySub">opslaan</small></button>
   </div>
   <input class="sr" type="file" id="pickCamera" accept="image/*" capture="environment">
   <input class="sr" type="file" id="pickGallery" accept="image/*" multiple>
@@ -737,12 +743,15 @@ function draw() {
   let n = 0, tr = 0, of = 0, chk = 0;
   for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (k.st !== "ok") chk++; }
   $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of);
-  $("#pctLbl").textContent = pct() + "%"; $("#checkCnt").textContent = chk ? chk : "";
+  $("#pctLbl").textContent = pct() + "%"; $("#checkCnt").textContent = chk;
   const waiting = S.queue.length + S.running;
   $("#queue").textContent = !navigator.onLine && [...S.live.values()].some(s => s.status === "offline") ? "Geen verbinding, foto's wachten" : waiting ? `${waiting} ${waiting === 1 ? "foto" : "foto's"} bezig` : "";
   $("#tDate").textContent = PR.datum ? fmtDate(parseDate(PR.datum)) : "";
-  const buys = listBuys(); $("#buyCnt").textContent = buys.length ? buys.length : "";
-  $("#buyBtn").disabled = !n; $("#buySub").textContent = n ? EUR.format(of) : "opslaan";
+  const buys = listBuys(); $("#buyCnt").textContent = buys.length || "";
+  $("#buyBtn").hidden = !n || S.filter === "buy"; $("#buySub").textContent = EUR.format(of);
+  $("#tabCheck").hidden = !(chk || S.filter === "check"); $("#tabBuy").hidden = !(buys.length || S.filter === "buy");
+  $("#tabAll").hidden = S.filter === "all"; $("#lowBtn").hidden = !n || S.filter !== "all";
+  $("#chips").hidden = ["#tabCheck", "#tabBuy", "#tabAll", "#lowBtn"].every(id => $(id).hidden);
   drawPct();
   const feed = $("#feed"); const keep = new Set(); const nodes = [];
   let html = !CAT.ready ? (S.loadError ? `<div class="notice"><b>De kaartendatabase kon niet laden.</b> Ververs de pagina.</div>` : `<div class="notice">Kaartendatabase laden…</div>`) : bannerHtml();
@@ -779,9 +788,9 @@ function bannerHtml() {
 }
 function emptyHtml() {
   return `<div class="empty"><div class="ghostgrid">${"<i></i>".repeat(9)}</div>
-    <h2>Scan je eerste binderpagina</h2>
-    <p>Fotografeer een pagina recht van boven. Elke kaart verschijnt hier met setcode, nummer, trendprijs en jouw bod.</p>
-    <p class="fine">Tip: maak eerst foto's van alle pagina's met je camera en kies ze daarna samen via Foto's.</p></div>`;
+    <h2>Scan je eerste pagina</h2>
+    <p>Tik op de camera en fotografeer een binderpagina recht van boven.</p>
+    <p class="fine">Meerdere foto's tegelijk kiezen kan met het knopje links onderin.</p></div>`;
 }
 function statusPill(s) {
   const c = (s.kaarten || []).filter(k => k.st !== "ok").length;
@@ -792,7 +801,8 @@ function statusPill(s) {
     case "offline": return `<span class="pill warn">Wacht op verbinding</span>`;
     case "fout": return `<span class="pill bad">Mislukt</span>`;
     case "leeg": return `<span class="pill">Geen kaarten gevonden</span>`;
-    default: return c ? `<span class="pill warn">${c} controleren</span>` : `<span class="pill ok">Klaar</span>`;
+    case "klaar": return "";
+    default: return "";
   }
 }
 function scanHtml(s, ks) {
@@ -800,8 +810,7 @@ function scanHtml(s, ks) {
   const title = s.hand ? "Handmatig toegevoegd" : `Foto ${idx}`;
   const busy = ["wacht", "lezen", "nummers"].includes(s.status);
   const sub = `${fmtTime(s.t)} · ${(s.kaarten || []).length} ${(s.kaarten || []).length === 1 ? "kaart" : "kaarten"}`;
-  let h = `<div class="scanhead">${s.foto ? `<img src="${s.foto}" alt="">` : `<span class="ph"></span>`}
-    <div class="t"><b>${title}</b><small>${sub}</small></div>${statusPill(s)}
+  let h = `<div class="scanhead"><span class="cap">${title} · ${sub}</span>${statusPill(s)}
     <button class="iconbtn" data-act="scanmenu" data-s="${s.id}" aria-label="Opties voor ${title}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
   if (s.err) h += `<div class="errrow"><div class="fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
   h += ks.map(k => cardHtml(s, k)).join("");
@@ -814,11 +823,10 @@ function cardHtml(s, k) {
   const name = card ? card.name : (k.lez.name || "Onbekende kaart") + (k.lang ? ` (${k.lang})` : "");
   const code = card ? `<span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span>` : `<span class="code">${esc(k.lez.number || "")}</span>`;
   const tags = [];
-  if (k.st === "check") tags.push(`<span class="tag warn">Controleer versie</span>`);
-  if (k.st === "none") tags.push(`<span class="tag warn">${k.lang ? "Niet Engels" : "Niet gevonden"}</span>`);
-  if (k.rev) tags.push(`<span class="tag rev">Reverse</span>`);
-  if (card && k.st !== "none" && card.rar && !card.plain) tags.push(`<span class="tag">${esc(shortRar(card.rar))}</span>`);
-  if (k.lez.sticker) tags.push(`<span class="tag">Sticker ${esc(k.lez.sticker)}</span>`);
+  if (k.st === "check") tags.push(`<span class="warn">· Controleer</span>`);
+  if (k.st === "none") tags.push(`<span class="bad">· ${k.lang ? "Niet Engels" : "Niet gevonden"}</span>`);
+  if (k.rev) tags.push(`<span class="rev">· Reverse</span>`);
+  if (card && k.st !== "none" && shortRar(card.rar || "")) tags.push(`<span>· ${esc(shortRar(card.rar))}</span>`);
   const own = Number.isFinite(k.eigen) && k.eigen !== null;
   const sub = src === "eigen" ? "eigen " + EUR.format(k.eigen) : src === "low" ? "low NL " + EUR.format(k.low) : "trend " + EUR.format(trend);
   const price = bod != null ? `<b class="num">${EUR.format(bod)}</b><small class="num ${src !== "trend" ? "own" : ""}">${sub}</small>` : `<b class="num">€ ?</b><small>geen prijs</small>`;
@@ -839,12 +847,12 @@ function detailHtml(s, k, card, own) {
   const alts = (k.alts || []).map(([sid, lid]) => CAT.byKey.get(sid + "|" + lid)).filter(Boolean);
   const pid = card && pidOf(card);
   let h = `<div class="detail" data-stop="1">`;
-  if (card) h += `<div class="fine">${esc(card.set.name)} · ${esc(card.rar || "")}${k.lez.name && norm(k.lez.name).join(" ") !== card.nn ? ` · gelezen als “${esc(k.lez.name)}”` : ""}</div>`;
+  if (card) h += `<div class="fine">${esc(card.set.name)}${shortRar(card.rar || "") ? " · " + esc(card.rar) : ""}${k.lez.sticker ? " · sticker " + esc(k.lez.sticker) : ""}${k.lez.name && norm(k.lez.name).join(" ") !== card.nn ? ` · gelezen als “${esc(k.lez.name)}”` : ""}</div>`;
   if (IMG_ON && card && imgOf(card)) h += `<div class="cmp">${k.thumb ? `<figure><img src="${k.thumb}" alt=""><figcaption>Jouw foto</figcaption></figure>` : ""}<figure>${refImg(card, "big")}<figcaption>Scan ${esc(codeOf(card))} ${esc(numOf(card))}</figcaption></figure></div>`;
   if (alts.length) h += `<div class="lbl">Andere versies</div><div class="alts">${alts.map(a => `<button class="alt${IMG_ON && imgOf(a) ? " withimg" : ""}" data-act="pick" data-s="${s.id}" data-k="${k.k}" data-key="${esc(a.key)}">${refImg(a, "altimg")}<span>${esc(shortRar(a.rar || ""))} ${trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></span></button>`).join("")}</div>`;
   const hasLow = Number.isFinite(k.low) && k.low !== null;
-  h += `<div class="own"><label class="lbl" for="low-${k.k}">CM low NL</label><input id="low-${k.k}" inputmode="decimal" placeholder="bijv. 3,20" value="${hasLow ? String(k.low).replace(".", ",") : ""}" data-act="low" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${hasLow && k.lowT ? `<span class="fine">${fmtTime(k.lowT)}</span>` : ""}</div>`;
-  h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div>`;
+  h += `<div class="prices2"><div class="own"><label class="lbl" for="low-${k.k}">CM low NL</label><input id="low-${k.k}" inputmode="decimal" placeholder="bijv. 3,20" value="${hasLow ? String(k.low).replace(".", ",") : ""}" data-act="low" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${hasLow && k.lowT ? `<span class="fine">ingevuld ${fmtTime(k.lowT)}</span>` : ""}</div>`;
+  h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div></div>`;
   h += `<div class="actions">
     ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="cardmarket">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
     <button class="btn" data-act="rev" data-s="${s.id}" data-k="${k.k}" aria-pressed="${k.rev}">Reverse</button>
