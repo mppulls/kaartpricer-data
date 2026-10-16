@@ -126,7 +126,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .info { min-width: 0; }
 .info b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .info .sub { display: flex; gap: 6px; align-items: baseline; color: var(--muted); font-size: 12.5px; margin-top: 3px; white-space: nowrap; overflow: hidden; }
-.info .sub .warn { color: var(--warn); font-weight: 600; } .info .sub .bad { color: var(--bad); font-weight: 600; } .info .sub .rev { color: var(--accent); font-weight: 600; }
+.info .sub .warn { color: var(--warn); font-weight: 600; } .info .sub .bad { color: var(--bad); font-weight: 600; } .info .sub .rev, .pctt { color: var(--accent); font-weight: 600; }
 .tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
 .tag.warn { background: var(--warn-soft); color: var(--warn); }
 .tag.rev { background: var(--accent-soft); color: var(--accent); }
@@ -138,7 +138,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
 .detail { grid-column: 1 / -1; display: grid; gap: 10px; padding-top: 4px; }
-.detail .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.detail .lbl, .sheet .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .alts { display: flex; flex-wrap: wrap; gap: 6px; }
 .alt { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; text-align: left; }
 .alt .code { display: block; color: var(--muted); }
@@ -148,7 +148,9 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .btn.danger { color: var(--bad); }
 .btn:disabled { opacity: .45; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-.prices2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.prices2 { display: grid; grid-template-columns: 1fr 1fr 62px; gap: 10px; }
+.own.pctown input { padding: 0 6px; text-align: center; }
+.pctnote { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
 .own { display: grid; gap: 4px; }
 .own input { width: 100%; height: 40px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-weight: 600; font-size: 16px; }
 .own .fine { font-size: 11px; }
@@ -266,6 +268,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
       <div class="sumright num"><span><b id="sCount">0</b> kaarten</span><span>trend <b id="sTrend">€ 0,00</b></span><span id="tDate" hidden></span></div>
     </div>
     <div class="pctrow" id="pctRow" hidden></div>
+    <div class="pctnote fine" id="pctNote" hidden></div>
     <div class="chips" id="chips" hidden>
       <button class="fchip" id="tabAll" type="button" data-filter="all" aria-pressed="true" hidden>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Lijst</button>
@@ -304,6 +307,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const cmLink = pid => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=2&language=1`;
 const round2 = x => Math.round(x * 100) / 100;
+const isNum = v => typeof v === "number" && Number.isFinite(v);
 const parseMoney = v => { const n = parseFloat(String(v || "").replace(/[^\d,.]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return Number.isFinite(n) && n >= 0 ? round2(n) : null; };
 const fmtDate = d => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 const parseDate = s => new Date(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
@@ -511,8 +515,8 @@ async function putList(l) {
 }
 function stripId(o) { const { id, ...rest } = o; return rest; }
 async function putScan(s) {
-  const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null,
-    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null })) };
+  const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null, pct: isNum(s.pct) ? s.pct : null,
+    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null, pct: isNum(k.pct) ? k.pct : null })) };
   if (S.db) {
     const path = `lijsten/${s.list}/scans/${s.id}`;
     try { await serial(path, () => S.db.doc(path).set(body)); }
@@ -722,12 +726,26 @@ function deleteCard(scanId, key) {
   editCard(scanId, key, k => { k._del = true; });
   toast(`${nm} verwijderd`, 5000, { label: "Ongedaan maken", fn: () => restoreScan(prev) });
 }
-function priceOf(k) {
+/* bod %: kaart gaat voor foto, foto gaat voor de lijst */
+const pctOf = (k, s) => isNum(k && k.pct) ? k.pct : isNum(s && s.pct) ? s.pct : pct();
+function priceOf(k, s) {
   const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
   const trend = card ? trendOf(card, k.rev) : null;
   const own = Number.isFinite(k.eigen) && k.eigen !== null, low = Number.isFinite(k.low) && k.low !== null;
-  const base = own ? k.eigen : low ? k.low : trend;
-  return { card, trend, base, src: own ? "eigen" : low ? "low" : "trend", bod: base != null ? round2(base * pct() / 100) : null };
+  const base = own ? k.eigen : low ? k.low : trend; const p = pctOf(k, s);
+  return { card, trend, base, pct: p, src: own ? "eigen" : low ? "low" : "trend", bod: base != null ? round2(base * p / 100) : null };
+}
+function overrides() {
+  let f = 0, c = 0;
+  for (const s of allScans()) { if (isNum(s.pct)) f++; for (const k of s.kaarten || []) if (isNum(k.pct)) c++; }
+  return { f, c, any: f + c > 0 };
+}
+function parsePct(v) { const n = Math.round(parseFloat(String(v || "").replace(",", ".").replace(/[^\d.]/g, ""))); return Number.isFinite(n) && n > 0 ? Math.min(200, n) : null; }
+function setScanPct(sId, v) { mutateScan(sId, s => { s.pct = v; }); toast(v == null ? `Foto volgt weer de lijst, ${pct()}%` : `Bod voor deze foto: ${v}%`); }
+async function resetOverrides() {
+  for (const s of allScans()) if (isNum(s.pct) || (s.kaarten || []).some(k => isNum(k.pct)))
+    await mutateScan(s.id, x => { x.pct = null; x.kaarten.forEach(k => { k.pct = null; }); });
+  toast(`Alles weer op ${pct()}%`);
 }
 
 /* ---------------------------------------------------------------- tekenen */
@@ -741,7 +759,7 @@ function draw() {
   const list = listOf(); const scans = allScans();
   $("#listName").textContent = list ? list.naam : "Kaartscan";
   let n = 0, tr = 0, of = 0, chk = 0;
-  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (k.st !== "ok") chk++; }
+  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k, s); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (k.st !== "ok") chk++; }
   $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of);
   $("#pctLbl").textContent = pct() + "%"; $("#checkCnt").textContent = chk;
   const waiting = S.queue.length + S.running;
@@ -768,7 +786,7 @@ function draw() {
     const ks = (s.kaarten || []).filter(k => S.filter === "all" || k.st !== "ok");
     if (S.filter === "check" && !ks.length && !["lezen", "nummers", "wacht", "fout", "offline"].includes(s.status)) continue;
     const openHere = S.open && (s.kaarten || []).some(k => k.k === S.open) ? S.open : "";
-    const sig = [s.id, s._v || 0, s.status, ks.length, pct(), S.filter, openHere, PR.datum, JSON.stringify(s.kaarten.map(k => [k.st, k.sid, k.lid, k.rev, k.eigen, k.low]))].join("~");
+    const sig = [s.id, s._v || 0, s.status, ks.length, pct(), s.pct, S.filter, openHere, PR.datum, JSON.stringify(s.kaarten.map(k => [k.st, k.sid, k.lid, k.rev, k.eigen, k.low, k.pct]))].join("~");
     let g = groupCache.get(s.id);
     if (!g || g.sig !== sig) { const el = document.createElement("section"); el.className = "scan"; el.innerHTML = scanHtml(s, ks); g = { sig, el }; groupCache.set(s.id, g); }
     keep.add(s.id); nodes.push(g.el);
@@ -809,7 +827,7 @@ function scanHtml(s, ks) {
   const idx = allScans().filter(x => !x.hand).reverse().findIndex(x => x.id === s.id) + 1;
   const title = s.hand ? "Handmatig toegevoegd" : `Foto ${idx}`;
   const busy = ["wacht", "lezen", "nummers"].includes(s.status);
-  const sub = `${fmtTime(s.t)} · ${(s.kaarten || []).length} ${(s.kaarten || []).length === 1 ? "kaart" : "kaarten"}`;
+  const sub = `${fmtTime(s.t)} · ${(s.kaarten || []).length} ${(s.kaarten || []).length === 1 ? "kaart" : "kaarten"}${isNum(s.pct) ? ` · <span class="pctt">bod ${s.pct}%</span>` : ""}`;
   let h = `<div class="scanhead"><span class="cap">${title} · ${sub}</span>${statusPill(s)}
     <button class="iconbtn" data-act="scanmenu" data-s="${s.id}" aria-label="Opties voor ${title}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
   if (s.err) h += `<div class="errrow"><div class="fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
@@ -819,12 +837,13 @@ function scanHtml(s, ks) {
   return h;
 }
 function cardHtml(s, k) {
-  const { card, trend, bod, src } = priceOf(k);
+  const { card, trend, bod, src } = priceOf(k, s);
   const name = card ? card.name : (k.lez.name || "Onbekende kaart") + (k.lang ? ` (${k.lang})` : "");
   const code = card ? `<span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span>` : `<span class="code">${esc(k.lez.number || "")}</span>`;
   const tags = [];
   if (k.st === "check") tags.push(`<span class="warn">· Controleer</span>`);
   if (k.st === "none") tags.push(`<span class="bad">· ${k.lang ? "Niet Engels" : "Niet gevonden"}</span>`);
+  if (isNum(k.pct)) tags.push(`<span class="pctt">· ${k.pct}%</span>`);
   if (k.rev) tags.push(`<span class="rev">· Reverse</span>`);
   if (card && k.st !== "none" && shortRar(card.rar || "")) tags.push(`<span>· ${esc(shortRar(card.rar))}</span>`);
   const own = Number.isFinite(k.eigen) && k.eigen !== null;
@@ -852,7 +871,8 @@ function detailHtml(s, k, card, own) {
   if (alts.length) h += `<div class="lbl">Andere versies</div><div class="alts">${alts.map(a => `<button class="alt${IMG_ON && imgOf(a) ? " withimg" : ""}" data-act="pick" data-s="${s.id}" data-k="${k.k}" data-key="${esc(a.key)}">${refImg(a, "altimg")}<span>${esc(shortRar(a.rar || ""))} ${trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></span></button>`).join("")}</div>`;
   const hasLow = Number.isFinite(k.low) && k.low !== null;
   h += `<div class="prices2"><div class="own"><label class="lbl" for="low-${k.k}">CM low NL</label><input id="low-${k.k}" inputmode="decimal" placeholder="bijv. 3,20" value="${hasLow ? String(k.low).replace(".", ",") : ""}" data-act="low" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${hasLow && k.lowT ? `<span class="fine">ingevuld ${fmtTime(k.lowT)}</span>` : ""}</div>`;
-  h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div></div>`;
+  h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div>`;
+  h += `<div class="own pctown"><label class="lbl" for="pct-${k.k}">Bod %</label><input id="pct-${k.k}" inputmode="numeric" placeholder="${isNum(s.pct) ? s.pct : pct()}" value="${isNum(k.pct) ? k.pct : ""}" data-act="kpct" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done" aria-label="Bod percentage voor deze kaart">${isNum(k.pct) ? `<button class="linkbtn" data-act="clearpct" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div></div>`;
   h += `<div class="actions">
     ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="cardmarket">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
     <button class="btn" data-act="rev" data-s="${s.id}" data-k="${k.k}" aria-pressed="${k.rev}">Reverse</button>
@@ -861,11 +881,14 @@ function detailHtml(s, k, card, own) {
   return h + `</div>`;
 }
 function drawPct() {
-  const row = $("#pctRow"); if (row.hidden) return;
-  const p = pct(); const opts = [40, 50, 60, 65, 70, 75, 80, 85, 90, 100];
-  if (row.dataset.p === String(p)) return; row.dataset.p = p;
+  const row = $("#pctRow"), note = $("#pctNote"); if (row.hidden) { note.hidden = true; return; }
+  const p = pct(), ov = overrides(), opts = [40, 50, 60, 65, 70, 75, 80, 85, 90, 100], key = [p, ov.f, ov.c].join("|");
+  if (row.dataset.p === key) return; row.dataset.p = key;
   row.innerHTML = opts.map(o => `<button class="chip num" data-pct="${o}" aria-pressed="${o === p}">${o}%</button>`).join("") +
     `<input class="pctin num" id="pctIn" inputmode="numeric" aria-label="Eigen percentage" placeholder="anders" value="${opts.includes(p) ? "" : p}">`;
+  note.hidden = !ov.any; if (!ov.any) return;
+  const parts = [ov.f && `${ov.f} ${ov.f === 1 ? "foto" : "foto's"}`, ov.c && `${ov.c} ${ov.c === 1 ? "kaart" : "kaarten"}`].filter(Boolean);
+  note.innerHTML = `<span>${parts.join(" en ")} ${ov.f + ov.c === 1 ? "heeft" : "hebben"} een eigen %.</span><button class="linkbtn" id="pctReset" type="button">Alles op ${p}%</button>`;
 }
 
 /* ---------------------------------------------------------------- interactie */
@@ -879,6 +902,7 @@ function setPct(v) {
 let swallowClick = false;
 document.addEventListener("click", e => {
   if (swallowClick) { e.preventDefault(); e.stopPropagation(); return; }
+  if (e.target.closest("#pctReset")) { resetOverrides(); return; }
   const pc = e.target.closest("[data-pct]"); if (pc) { setPct(pc.dataset.pct); return; }
   const a = e.target.closest("[data-act]"); if (!a) return;
   if (e.target.closest("[data-stop]") && a.dataset.act === "toggle") return;
@@ -892,12 +916,13 @@ document.addEventListener("click", e => {
   else if (act === "buydel") deleteBuy(a.dataset.b);
   else if (act === "finish") openFinish();
   else if (act === "clearown") editCard(sId, key, k => { k.eigen = null; });
+  else if (act === "clearpct") editCard(sId, key, k => { k.pct = null; });
   else if (act === "search") openSearch(sId, key);
   else if (act === "retry") { const s = scanById(sId); if (s) retryScan(s, "quick"); }
   else if (act === "scanmenu") openScanMenu(sId);
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && e.target.matches("[data-act='own'], [data-act='low']")) e.target.blur();
+  if (e.key === "Enter" && e.target.matches("[data-act='own'], [data-act='low'], [data-act='kpct'], #spIn")) e.target.blur();
   if ((e.key === "Enter" || e.key === " ") && e.target.matches(".card[data-act='toggle']")) { e.preventDefault(); e.target.click(); }
 });
 document.addEventListener("change", e => {
@@ -908,6 +933,8 @@ document.addEventListener("change", e => {
   } else if (t.matches("[data-act='low']")) {
     const v = parseMoney(t.value);
     editCard(t.dataset.s, t.dataset.k, k => { k.low = v; k.lowT = v != null ? Date.now() : null; });
+  } else if (t.matches("[data-act='kpct']")) {
+    const v = parsePct(t.value); editCard(t.dataset.s, t.dataset.k, k => { k.pct = v; });
   } else if (t.id === "pctIn" && t.value) setPct(t.value);
   else if (t.id === "pickCamera" || t.id === "pickGallery") { addFiles(t.files); t.value = ""; }
 });
@@ -970,15 +997,21 @@ function openMenu() {
 }
 function openScanMenu(sId) {
   const s = scanById(sId); if (!s) return; const hasBm = S.bitmaps.has(sId);
-  sheet(`<h3>${s.hand ? "Handmatig toegevoegd" : "Foto " + fmtTime(s.t)}</h3>
+  const cur = isNum(s.pct) ? s.pct : null, def = pct(), opts = [50, 60, 65, 70, 75, 80, 85, 90].filter(o => o !== def);
+  const sh = sheet(`<h3>${s.hand ? "Handmatig toegevoegd" : "Foto " + fmtTime(s.t)}</h3>
+    <div class="lbl">Bod voor deze foto</div>
+    <div class="chips"><button class="chip" data-sp="" aria-pressed="${cur == null}">Lijst ${def}%</button>${opts.map(o => `<button class="chip num" data-sp="${o}" aria-pressed="${cur === o}">${o}%</button>`).join("")}<input class="pctin num" id="spIn" inputmode="numeric" enterkeyhint="done" placeholder="anders" aria-label="Eigen percentage voor deze foto" value="${cur != null && !opts.includes(cur) ? cur : ""}"></div>
+    <p class="fine" style="margin:-4px 0 4px">Voor één kaart: tik de kaart aan en vul Bod % in.</p>
     ${hasBm ? `<button class="item" data-m="acc"><span class="t"><b>Opnieuw lezen, nauwkeurig</b><small>Langzamer, beter bij twijfel of slechte foto</small></span></button>
     <button class="item" data-m="again"><span class="t"><b>Opnieuw lezen</b><small>Snel</small></span></button>` : ""}
     <button class="item" data-m="del"><span class="t"><b>Verwijder deze foto</b><small>Met alle ${(s.kaarten || []).length} kaarten</small></span></button>`,
     async (e, close) => {
+      const sp = e.target.closest("[data-sp]"); if (sp) { close(); setScanPct(sId, sp.dataset.sp === "" ? null : Number(sp.dataset.sp)); return; }
       const m = e.target.closest("[data-m]"); if (!m) return; close();
       if (m.dataset.m === "acc") retryScan(s, "default"); else if (m.dataset.m === "again") retryScan(s, "quick");
       else { await deleteScanDoc(s).catch(() => toast("Verwijderen mislukt")); render(); }
     });
+  sh.el.addEventListener("change", e => { if (e.target.id !== "spIn") return; const v = parsePct(e.target.value); if (v == null) return; sh.close(); setScanPct(sId, v); });
 }
 function searchCards(q) { const r = searchPass(q, false); return r.length ? r : searchPass(q, true); }
 function wordHit(t, w, fuzzy) {
@@ -1139,8 +1172,8 @@ function busyScans() { return allScans().some(s => ["wacht", "lezen", "nummers"]
 function activeCards() {
   const out = [];
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
-    const p = priceOf(k);
-    out.push({ naam: p.card ? p.card.name : (k.lez.name || "Onbekende kaart"), set: p.card ? p.card.set.name : "", code: p.card ? codeOf(p.card) : "",
+    const p = priceOf(k, s);
+    out.push({ pct: p.pct, naam: p.card ? p.card.name : (k.lez.name || "Onbekende kaart"), set: p.card ? p.card.set.name : "", code: p.card ? codeOf(p.card) : "",
       nr: p.card ? numOf(p.card, k.lez.number) : (k.lez.number || ""), pid: p.card ? pidOf(p.card) : null, rev: !!k.rev, sid: k.sid || null, lid: k.lid || null,
       trend: p.trend ?? null, low: Number.isFinite(k.low) ? k.low : null, eigen: Number.isFinite(k.eigen) ? k.eigen : null,
       basis: p.base ?? null, bod: p.bod ?? null, thumb: k.thumb || null });
@@ -1170,7 +1203,7 @@ function openBuySheet() {
   const tr = cards.reduce((a, c) => a + (c.trend || 0), 0), bod = round2(cards.reduce((a, c) => a + (c.bod || 0), 0));
   let via = (() => { try { return localStorage.getItem("kaartscan.via") || ""; } catch { return ""; } })();
   sheet(`<h3>Inkoop opslaan</h3>
-    <div class="sumgrid"><div><small>Kaarten</small><b class="num">${cards.length}</b></div><div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div><div><small>Bod ${pct()}%</small><b class="num">${EUR.format(bod)}</b></div></div>
+    <div class="sumgrid"><div><small>Kaarten</small><b class="num">${cards.length}</b></div><div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div><div><small>${overrides().any ? "Bod" : `Bod ${pct()}%`}</small><b class="num">${EUR.format(bod)}</b></div></div>
     <label class="lbl" for="buyPaid">Betaald</label>
     <input class="bigin" id="buyPaid" inputmode="decimal" value="${String(bod.toFixed(2)).replace(".", ",")}" autocomplete="off">
     <label class="lbl" for="buySeller">Verkoper, optioneel</label>
@@ -1283,11 +1316,12 @@ document.addEventListener("touchend", endSwipe); document.addEventListener("touc
 
 /* exporteren */
 function rows() {
-  const out = [["Naam", "Set", "Nummer", "Trend", "CM low NL", "Eigen prijs", `Bod ${pct()}%`, "Cardmarket (NL, NM)"]];
+  const mixed = overrides().any;     // met eigen % per foto of kaart komt er een kolom Bod % bij
+  const out = [["Naam", "Set", "Nummer", "Trend", "CM low NL", "Eigen prijs", mixed ? "Bod" : `Bod ${pct()}%`, ...(mixed ? ["Bod %"] : []), "Cardmarket (NL, NM)"]];
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
-    const { card, trend, bod } = priceOf(k);
+    const { card, trend, bod, pct: p } = priceOf(k, s);
     out.push([card ? card.name + (k.rev ? " (reverse)" : "") : (k.lez.name || "?"), card ? `${card.set.name} (${codeOf(card)})` : "", card ? "'" + numOf(card, k.lez.number) : "",
-      trend ?? "", k.low ?? "", k.eigen ?? "", bod ?? "", card && pidOf(card) ? cmLink(pidOf(card)) : ""]);
+      trend ?? "", k.low ?? "", k.eigen ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card)) : ""]);
   }
   return out;
 }
