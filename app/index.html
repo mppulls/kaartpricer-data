@@ -212,12 +212,34 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); }
-.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
-.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
+.sheet .item.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
+.sheet .item.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
 .srow .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .srow .sp { text-align: right; } .srow .sp b { display: block; font-size: 15px; } .srow .sp small { color: var(--muted); font-size: 11px; }
 .sbtn { background: var(--surface); width: 36px; height: 36px; color: var(--accent); }
 .sbtn.add { background: var(--accent); color: var(--accent-ink); }
+.cmp { display: flex; gap: 12px; }
+.cmp figure { margin: 0; display: grid; gap: 4px; justify-items: start; }
+.cmp img, .cmp .big { width: 120px; height: 168px; border-radius: 8px; object-fit: cover; background: var(--surface-2); display: block; }
+.cmp figcaption { font-size: 11px; color: var(--muted); }
+.alt.withimg { display: grid; grid-template-columns: 44px auto; gap: 8px; align-items: center; padding: 6px 10px 6px 6px; }
+.altimg { width: 44px; height: 62px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.sheet .item.srow:has(.sthumb) { grid-template-columns: 40px minmax(0, 1fr) auto auto auto; }
+.sheet .item.srow.pick:has(.sthumb) { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.sthumb { width: 40px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.cam { position: fixed; inset: 0; z-index: 40; background: #000; color: #fff; display: grid; grid-template-rows: 1fr auto; }
+.cam video { width: 100%; height: 100%; object-fit: cover; grid-row: 1 / -1; grid-column: 1; }
+.cam .guide { grid-row: 1; grid-column: 1; align-self: center; justify-self: center; position: relative; width: min(88vw, calc((100vh - 200px) * .78)); aspect-ratio: 3 / 3.85; border: 2px solid rgba(255,255,255,.9); border-radius: 10px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.45);
+  background-image: linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(90deg, rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(90deg, rgba(255,255,255,.35), rgba(255,255,255,.35));
+  background-size: 100% 1px, 100% 1px, 1px 100%, 1px 100%; background-position: 0 33.33%, 0 66.66%, 33.33% 0, 66.66% 0; background-repeat: no-repeat; }
+.cam .hint { position: absolute; left: 0; right: 0; top: -34px; text-align: center; font-size: 14px; font-weight: 600; }
+.cam .bar { grid-row: 2; grid-column: 1; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 18px max(20px, env(safe-area-inset-left, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)); background: rgba(0,0,0,.55); }
+.cam .shut { width: 76px; height: 76px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); }
+.cam .shut:active { background: #fff; }
+.cam .x { justify-self: start; color: #fff; font-weight: 600; font-size: 16px; }
+.cam .done { justify-self: end; color: #fff; font-weight: 700; font-size: 16px; }
+.cam .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.cam .flash.on { opacity: .7; transition: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
@@ -323,12 +345,12 @@ async function loadData() {
     fetch("catalog.json", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("catalogus"); return r.json(); }),
     fetch("prices.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { datum: null, p: {} }).catch(() => ({ datum: null, p: {} })),
   ]);
-  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || "", total: s[3] || 0, rel: s[4] || "" }));
+  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || "", total: s[3] || 0, rel: s[4] || "", serie: s[5] || "", imgSet: s[6] || s[0] }));
   c.cards.forEach(r => {
     const set = CAT.sets[r[0]], rar = c.rarities[r[5]] || "", tok = norm(r[2]);
     const card = {
       sid: set.id, set, lid: r[1], name: r[2], hp: r[3] || 0, atk: new Set(String(r[4] || "").split("|").filter(Boolean).map(a => norm(a).join(" "))),
-      rar, plain: PLAIN.has(rar.toLowerCase()), promo: /promo/i.test(rar) || /promo/i.test(set.name), pids: r[6] || [],
+      rar, plain: PLAIN.has(rar.toLowerCase()), promo: /promo/i.test(rar) || /promo/i.test(set.name), pids: r[6] || [], imgf: r[7] || 0,
       nn: tok.join(" "), suf: tok.filter(t => SUF.has(t)).join(" "),
     };
     card.key = card.sid + "|" + card.lid;
@@ -340,6 +362,14 @@ async function loadData() {
   PR.datum = p.datum; PR.p = p.p || {};
   CAT.ready = true;
 }
+const IMG_ON = !!(window.KP && window.KP.img);
+const STANDALONE = !!(window.KP && window.KP.standalone);
+function imgOf(card) {
+  if (!IMG_ON || !card || !card.imgf || !card.set.serie) return null;
+  return `/img/${card.set.serie}/${card.imgf === 2 ? card.set.imgSet : card.set.id}/${encodeURIComponent(card.lid)}.webp`;
+}
+const refImg = (card, cls = "thumb") => { const u = imgOf(card); return u ? `<img class="${cls}" src="${u}" alt="" loading="lazy" data-ref="1">` : ""; };
+document.addEventListener("error", e => { const t = e.target; if (t && t.tagName === "IMG" && t.dataset && t.dataset.ref) { const ph = document.createElement("span"); ph.className = t.className; t.replaceWith(ph); } }, true);
 function pidOf(card) { if (!card) return null; return card.pids.find(p => PR.p[p]) || card.pids[0] || null; }
 function trendOf(card, rev) {
   const pid = pidOf(card); const v = pid && PR.p[pid]; if (!v) return null;
@@ -794,7 +824,7 @@ function cardHtml(s, k) {
   const price = bod != null ? `<b class="num">${EUR.format(bod)}</b><small class="num ${src !== "trend" ? "own" : ""}">${sub}</small>` : `<b class="num">€ ?</b><small>geen prijs</small>`;
   const open = S.open === k.k;
   let h = `<div class="swipe" data-s="${s.id}" data-k="${k.k}"><span class="swipe-lbl">Verwijder</span><div class="card ${k.st !== "ok" ? k.st : ""} ${S.fresh.has(k.k) ? "fresh" : ""}" data-act="toggle" data-s="${s.id}" data-k="${k.k}" role="button" tabindex="0" aria-expanded="${open}">
-    ${k.thumb ? `<img class="thumb" src="${k.thumb}" alt="">` : `<span class="thumb"></span>`}
+    ${k.thumb ? `<img class="thumb" src="${k.thumb}" alt="">` : (refImg(card) || `<span class="thumb"></span>`)}
     <div class="info"><b>${esc(name)}</b><div class="sub">${code}${tags.join("")}</div></div>
     <div class="price">${price}</div>`;
   if (open) h += detailHtml(s, k, card, own);
@@ -810,7 +840,8 @@ function detailHtml(s, k, card, own) {
   const pid = card && pidOf(card);
   let h = `<div class="detail" data-stop="1">`;
   if (card) h += `<div class="fine">${esc(card.set.name)} · ${esc(card.rar || "")}${k.lez.name && norm(k.lez.name).join(" ") !== card.nn ? ` · gelezen als “${esc(k.lez.name)}”` : ""}</div>`;
-  if (alts.length) h += `<div class="lbl">Andere versies</div><div class="alts">${alts.map(a => `<button class="alt" data-act="pick" data-s="${s.id}" data-k="${k.k}" data-key="${esc(a.key)}">${esc(shortRar(a.rar || ""))} ${trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></button>`).join("")}</div>`;
+  if (IMG_ON && card && imgOf(card)) h += `<div class="cmp">${k.thumb ? `<figure><img src="${k.thumb}" alt=""><figcaption>Jouw foto</figcaption></figure>` : ""}<figure>${refImg(card, "big")}<figcaption>Scan ${esc(codeOf(card))} ${esc(numOf(card))}</figcaption></figure></div>`;
+  if (alts.length) h += `<div class="lbl">Andere versies</div><div class="alts">${alts.map(a => `<button class="alt${IMG_ON && imgOf(a) ? " withimg" : ""}" data-act="pick" data-s="${s.id}" data-k="${k.k}" data-key="${esc(a.key)}">${refImg(a, "altimg")}<span>${esc(shortRar(a.rar || ""))} ${trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></span></button>`).join("")}</div>`;
   const hasLow = Number.isFinite(k.low) && k.low !== null;
   h += `<div class="own"><label class="lbl" for="low-${k.k}">CM low NL</label><input id="low-${k.k}" inputmode="decimal" placeholder="bijv. 3,20" value="${hasLow ? String(k.low).replace(".", ",") : ""}" data-act="low" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${hasLow && k.lowT ? `<span class="fine">${fmtTime(k.lowT)}</span>` : ""}</div>`;
   h += `<div class="own"><label class="lbl" for="own-${k.k}">Eigen prijs</label><input id="own-${k.k}" inputmode="decimal" placeholder="bijv. 4,50" value="${own ? String(k.eigen).replace(".", ",") : ""}" data-act="own" data-s="${s.id}" data-k="${k.k}" enterkeyhint="done">${own ? `<button class="linkbtn" data-act="clearown" data-s="${s.id}" data-k="${k.k}">Wis</button>` : ""}</div>`;
@@ -922,10 +953,11 @@ function openMenu() {
     <button class="item" data-m="low"><span class="t"><b>Low checken</b><small>Loop je kaarten langs en vul de laagste NL prijs in</small></span></button>
     <button class="item" data-m="add"><span class="t"><b>Zoek een kaart</b><small>Trend en Cardmarket direct, of toevoegen aan je lijst</small></span></button>
     <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
+    ${STANDALONE ? `<button class="item" data-m="import"><span class="t"><b>Lijsten uit Claude importeren</b><small>Eenmalig, je lijsten en inkopen uit de Claude versie</small></span></button>` : ""}
     <p class="fine">Trend is de Cardmarket trendprijs ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) : ""}. Je bod rekent met je eigen prijs, anders je CM low NL, anders de trend. Dat is niet de laagste NL NM aanbieding: tik een kaart aan en open Cardmarket om die te zien.</p>`,
     (e, close) => {
       const m = e.target.closest("[data-m]"); if (!m) return; close();
-      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "buy") openBuySheet(); else if (m.dataset.m === "finish") openFinish(); else if (m.dataset.m === "low") openLow(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else openLists();
+      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "buy") openBuySheet(); else if (m.dataset.m === "finish") openFinish(); else if (m.dataset.m === "low") openLow(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else if (m.dataset.m === "import") importSeed(); else openLists();
     });
 }
 function openScanMenu(sId) {
@@ -987,7 +1019,7 @@ function openSearch(sId, key) {
   const q = $("#q", sh.el), res = $("#res", sh.el); let timer = null;
   const row = c => {
     const t = trendOf(c, false), r = trendOf(c, true);
-    const info = `<span class="t"><b>${esc(c.name)}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
+    const info = `${IMG_ON ? (refImg(c, "sthumb") || `<span class="sthumb"></span>`) : ""}<span class="t"><b>${esc(c.name)}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
       <span class="sp num"><b>${t ? EUR.format(t) : "€ ?"}</b>${r ? `<small>rev ${EUR.format(r)}</small>` : ""}</span>`;
     if (k0) return `<button class="item srow pick" data-key="${esc(c.key)}">${info}</button>`;
     return `<div class="item srow">${info}
@@ -1057,7 +1089,7 @@ function drawLow(el) {
   const pctDone = Math.round(r.i / r.items.length * 100);
   body.innerHTML = `<div style="display:grid;gap:16px">
     <div class="lowhead"><b class="num">${r.i + 1} / ${r.items.length}</b><span class="prog"><i style="width:${pctDone}%"></i></span><button class="linkbtn" data-low="close">Stop</button></div>
-    <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : `<span class="ph"></span>`}
+    <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : (refImg(card, "ph") || `<span class="ph"></span>`)}
       <div><b>${esc(card.name)}${k.rev ? " (reverse)" : ""}</b><span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span> <span class="tag">${esc(shortRar(card.rar || ""))}</span>
       <div class="fine">${esc(card.set.name)}</div><div class="fine num">Trend ${t ? EUR.format(t) : "onbekend"}${Number.isFinite(k.low) && k.low !== null ? ` · vorige low ${EUR.format(k.low)}` : ""}</div></div></div>
     <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">Open Cardmarket NL NM
@@ -1101,7 +1133,7 @@ function activeCards() {
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
     const p = priceOf(k);
     out.push({ naam: p.card ? p.card.name : (k.lez.name || "Onbekende kaart"), set: p.card ? p.card.set.name : "", code: p.card ? codeOf(p.card) : "",
-      nr: p.card ? numOf(p.card, k.lez.number) : (k.lez.number || ""), pid: p.card ? pidOf(p.card) : null, rev: !!k.rev,
+      nr: p.card ? numOf(p.card, k.lez.number) : (k.lez.number || ""), pid: p.card ? pidOf(p.card) : null, rev: !!k.rev, sid: k.sid || null, lid: k.lid || null,
       trend: p.trend ?? null, low: Number.isFinite(k.low) ? k.low : null, eigen: Number.isFinite(k.eigen) ? k.eigen : null,
       basis: p.base ?? null, bod: p.bod ?? null, thumb: k.thumb || null });
   }
@@ -1175,7 +1207,7 @@ function buysHtml() {
       <div class="t"><b>Inkoop ${b.nr}${b.verkoper ? " · " + esc(b.verkoper) : ""}</b><small>${fmtTime(b.t)} · ${b.n} ${b.n === 1 ? "kaart" : "kaarten"}${b.via ? " · " + esc(b.via) : ""}</small></div>
       <div class="price"><b class="num">${EUR.format(b.betaald || 0)}</b><small class="num">trend ${EUR.format(b.trend || 0)}</small></div></div>`;
     if (open) {
-      h += (b.kaarten || []).map(c => `<div class="buyrow">${c.thumb ? `<img src="${c.thumb}" alt="">` : `<span class="ph"></span>`}
+      h += (b.kaarten || []).map(c => `<div class="buyrow">${c.thumb ? `<img src="${c.thumb}" alt="">` : (c.sid ? refImg(CAT.byKey.get(c.sid + "|" + c.lid), "ph") : "") || `<span class="ph"></span>`}
         <div style="min-width:0"><b>${esc(c.naam)}${c.rev ? " (reverse)" : ""}</b><small><span class="code">${esc(c.code)} ${esc(c.nr)}</span>${c.trend ? " · trend " + EUR.format(c.trend) : ""}</small></div>
         <div class="price"><b class="num">${EUR.format(c.inkoop || 0)}</b><small>inkoop</small></div></div>`).join("");
       h += `<div class="errrow"><span class="fine">Inkoop per kaart is het betaalde bedrag verdeeld naar waarde.</span><button class="linkbtn" style="color:var(--bad)" data-act="buydelask" data-b="${b.id}">Verwijder</button></div><div id="bd-${b.id}" style="padding:0 12px 12px"></div>`;
@@ -1293,6 +1325,43 @@ function toast(msg, ms = 3200, action) {
   const h = $("#toastHost"); h.innerHTML = `<div class="toast"><span>${esc(msg)}</span>${action ? `<button class="toastbtn" id="toastAct" type="button">${esc(action.label)}</button>` : ""}</div>`;
   if (action) $("#toastAct").addEventListener("click", () => { h.innerHTML = ""; action.fn(); });
   clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms);
+}
+
+/* ---------------------------------------------------------------- camera met kader (alleen in de losse app) */
+async function openCam() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false }); }
+  catch { toast("Camera niet beschikbaar, de gewone camera opent"); $("#pickCamera").click(); return; }
+  const el = document.createElement("div"); el.className = "cam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Camera");
+  el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Leg de pagina precies in het kader</div></div><div class="flash"></div>
+    <div class="bar"><button class="x" type="button">Sluiten</button><button class="shut" type="button" aria-label="Foto maken"></button><button class="done" type="button">Klaar</button></div>`;
+  document.body.appendChild(el);
+  const video = $("video", el); video.srcObject = stream; await video.play().catch(() => {});
+  let n = 0;
+  const close = () => { stream.getTracks().forEach(t => t.stop()); el.remove(); };
+  $(".x", el).addEventListener("click", close); $(".done", el).addEventListener("click", close);
+  $(".shut", el).addEventListener("click", async () => {
+    const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return;
+    const vr = video.getBoundingClientRect(), gr = $(".guide", el).getBoundingClientRect();
+    const sc = Math.max(vr.width / vw, vr.height / vh), ox = (vr.width - vw * sc) / 2, oy = (vr.height - vh * sc) / 2, pad = 0.05;
+    let w = gr.width / sc, h = gr.height / sc, x0 = (gr.left - vr.left - ox) / sc - w * pad, y0 = (gr.top - vr.top - oy) / sc - h * pad;
+    w *= 1 + 2 * pad; h *= 1 + 2 * pad; x0 = Math.max(0, x0); y0 = Math.max(0, y0); w = Math.min(vw - x0, w); h = Math.min(vh - y0, h);
+    const c = canvasOf(w, h); c.getContext("2d").drawImage(video, x0, y0, w, h, 0, 0, c.width, c.height);
+    const fl = $(".flash", el); fl.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => fl.classList.remove("on")));
+    const blob = await toBlob(c, 0.92); n++; $(".done", el).textContent = `Klaar (${n})`;
+    addFiles([new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" })]);
+  });
+}
+if (STANDALONE && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) $(".fab").addEventListener("click", e => { e.preventDefault(); openCam(); });
+
+async function importSeed() {
+  if (!S.db) { toast("Opslag niet beschikbaar"); return; }
+  const r = await fetch("/seed.json", { cache: "no-store" }).catch(() => null);
+  if (!r || !r.ok) { toast("Er staat niets klaar om te importeren"); return; }
+  const j = await r.json(); let n = 0;
+  toast("Importeren…", 60000);
+  for (const d of j.docs || []) { try { await S.db.doc(d.path).set(d.data); n++; } catch {} }
+  toast(`${n} onderdelen geïmporteerd`, 4000);
 }
 
 /* ---------------------------------------------------------------- start */

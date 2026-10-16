@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["build/**", ".github/workflows/**"]
+    paths: ["build/**", ".github/workflows/**", "web/**", "app/**", "kaartpricer.py"]
 permissions:
   contents: write
 concurrency: data
@@ -41,3 +41,23 @@ jobs:
           git add -A
           git -c user.name=kaartpricer -c user.email=kaartpricer@users.noreply.github.com commit -q -m "data $(date -u +%F)"
           git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+      - name: Losse app bouwen en publiceren op branch site (Cloudflare Pages)
+        run: |
+          mkdir -p ~/kaartpricer
+          python3 - <<'PY'
+          import gzip, os, shutil
+          home = os.path.expanduser("~/kaartpricer")
+          for name in ("catalog", "prices", "products", "images"):
+              src = f"/tmp/out/{name}.json.gz"
+              if os.path.exists(src):
+                  open(f"{home}/{name}.json", "wb").write(gzip.decompress(open(src, "rb").read()))
+          shutil.copy("/tmp/out/meta.json", f"{home}/meta.json")
+          PY
+          mkdir -p /tmp/appdata && python3 build/app_data.py /tmp/appdata
+          if [ -f web/seed.json ]; then cp web/seed.json /tmp/appdata/; fi
+          python3 build/web_build.py /tmp/site /tmp/appdata
+          cd /tmp/site
+          git init -q -b site
+          git add -A
+          git -c user.name=kaartpricer -c user.email=kaartpricer@users.noreply.github.com commit -q -m "site $(date -u +%F)"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" site

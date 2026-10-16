@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11141b">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>MP Kaartscan</title>
+<style>
+:root { --bg: #f2f3f6; --surface: #fff; --ink: #11141b; --muted: #5b6475; --line: #dfe3ea; --accent: #2a43e6; --accent-ink: #fff; --bad: #b8301a; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0d0f14; --surface: #161a22; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37; --accent: #8697ff; --accent-ink: #0d0f14; --bad: #ff7a63; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: max(16px, env(safe-area-inset-left)) ; }
+form { width: min(360px, 100%); background: var(--surface); border-radius: 20px; padding: 28px 22px; display: grid; gap: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+h1 { margin: 0; font-size: 22px; }
+p { margin: 0; color: var(--muted); font-size: 14px; }
+input { height: 54px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font-size: 22px; font-weight: 600; text-align: center; letter-spacing: .08em; }
+input:focus { outline: none; border-color: var(--accent); }
+button { height: 50px; border: 0; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-size: 16px; font-weight: 700; }
+.err { color: var(--bad); min-height: 20px; font-size: 14px; }
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>MP Kaartscan</h1>
+  <p>Vul de teamcode in. Je blijft daarna een jaar ingelogd op dit toestel.</p>
+  <input id="code" type="password" inputmode="text" autocomplete="current-password" aria-label="Teamcode" autofocus>
+  <button type="submit">Inloggen</button>
+  <div class="err" id="err" aria-live="polite"></div>
+</form>
+<script>
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault(); const err = document.getElementById("err"); err.textContent = "";
+  const r = await fetch("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: document.getElementById("code").value }) }).catch(() => null);
+  if (r && r.ok) location.href = "/"; else err.textContent = r ? "Deze code klopt niet." : "Geen verbinding.";
+});
+</script>
+</body>
+</html>

@@ -18,3 +18,9 @@ De branch `data` wordt elke dag overschreven zonder geschiedenis, zo blijft de r
 Handmatig verversen: tabblad Actions, workflow "data", Run workflow.
 
 Houd deze repo privé: de prijslijst van Cardmarket is voor eigen gebruik.
+
+## Losse app (Cloudflare Pages)
+
+* `web/`: serverdeel (`functions/`), statische bestanden (`public/`), Apps Script voor de sheet en `SETUP.md` met de stappen.
+* `build/web_build.py` maakt van `app/index.html` de losse versie; de workflow zet het resultaat elke nacht en bij elke wijziging op de branch `site`, waar Cloudflare Pages van publiceert.
+* `web/seed.json` is een eenmalige export van de Claude versie, te importeren via het menu van de app.
