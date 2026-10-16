@@ -71,7 +71,9 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .iconbtn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
 .iconbtn:active { background: var(--surface-2); }
 .sum { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.sumleft { display: grid; gap: 2px; }
+.sumleft { display: grid; gap: 2px; min-width: 0; }
+.offerrow { display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; }
+.mkt { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .sumleft b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.05; }
 .pctbtn { justify-self: start; display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .pctbtn span { color: var(--accent); }
@@ -160,7 +162,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .switch i { position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .15s; }
 .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
 .switch[aria-checked="true"] i { transform: translateX(19px); }
-.openbtn { justify-self: end; color: var(--warn); font-weight: 600; font-size: 13px; padding: 0; }
+.openbtn { justify-self: end; color: var(--warn); font-weight: 600; font-size: 13px; padding: 0; white-space: nowrap; }
 .lowpill { height: 30px; padding: 0 13px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; }
 .pctnote { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
 .own { display: grid; gap: 4px; }
@@ -275,7 +277,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
     <div class="sum">
       <div class="sumleft">
         <button class="pctbtn" id="pctBtn" type="button" aria-expanded="false">Bod <span id="pctLbl">70%</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
-        <b class="num" id="sOffer">€ 0,00</b>
+        <div class="offerrow"><b class="num" id="sOffer">€ 0,00</b><span class="mkt num" id="sMarket">€ 0,00 markt</span></div>
       </div>
       <div class="sumright num"><span><b id="sCount">0</b> kaarten</span><span id="sTrendRow" hidden>trend <b id="sTrend">€ 0,00</b></span><button class="openbtn" id="sOpen" type="button" hidden></button><span id="tDate" hidden></span></div>
     </div>
@@ -819,9 +821,9 @@ const groupCache = new Map();
 function draw() {
   const list = listOf(); const scans = allScans();
   $("#listName").textContent = list ? list.naam + (ownerOf(list) ? " · " + ownerOf(list) : "") : "Kaartscan";
-  let n = 0, tr = 0, of = 0, chk = 0, open = 0;
-  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k, s); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (p.src === "open") open++; if (k.st !== "ok") chk++; }
-  $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of);
+  let n = 0, tr = 0, of = 0, chk = 0, open = 0, mk = 0;
+  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k, s); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (p.base) mk += p.base; if (p.src === "open") open++; if (k.st !== "ok") chk++; }
+  $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of); $("#sMarket").textContent = EUR.format(mk) + " markt";
   $("#sTrendRow").hidden = !listTrend(); $("#sOpen").hidden = !open; $("#sOpen").textContent = `${open} zonder prijs`;
   $("#pctLbl").textContent = pct() + "%" + (listTrend() ? " · trend" : ""); $("#checkCnt").textContent = chk;
   const waiting = S.queue.length + S.running;
