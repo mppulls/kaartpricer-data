@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Maakt de compacte databestanden voor de data branch.
 
-  python3 build/build_data.py CATALOGUS.json PRIJZEN.json PRODUCTEN.json VORIGE_MAP UIT_MAP
+  python3 build/build_data.py CATALOGUS.json PRIJZEN.json PRODUCTEN.json VORIGE_MAP UIT_MAP [TCGDEX_DATAS.json]
 
 PRIJZEN en PRODUCTEN zijn de dagelijkse publieke bestanden van Cardmarket. Ontbreekt er een (download mislukt),
 dan wordt de versie uit VORIGE_MAP (de vorige data branch) overgenomen, zodat de catalogus toch ververst.
@@ -22,7 +22,7 @@ def load(path):
         print("niet bruikbaar:", path, str(e)[:120]); return None
 
 
-def main(cat_path, price_path, prod_path, prev_dir, out):
+def main(cat_path, price_path, prod_path, prev_dir, out, datas_path=None):
     os.makedirs(out, exist_ok=True); meta = {"gebouwd": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="minutes")}
     cards = []
     for c in load(cat_path):
@@ -49,8 +49,15 @@ def main(cat_path, price_path, prod_path, prev_dir, out):
                 os.path.join(out, "products.json.gz")); meta["producten"] = len(pl["products"])
     elif os.path.exists(os.path.join(prev_dir, "products.json.gz")):
         shutil.copy(os.path.join(prev_dir, "products.json.gz"), out)
+    # welke kaarten een scan hebben op assets.tcgdex.net (alleen Engels): {serie: {set: [nummers]}}
+    dt = load(datas_path) if datas_path else None
+    if dt and isinstance(dt.get("en"), dict):
+        img = {serie: {st: sorted(cards.keys()) for st, cards in sets.items() if isinstance(cards, dict)} for serie, sets in dt["en"].items() if isinstance(sets, dict)}
+        dump_gz(img, os.path.join(out, "images.json.gz")); meta["plaatjes"] = sum(len(v) for s in img.values() for v in s.values())
+    elif os.path.exists(os.path.join(prev_dir, "images.json.gz")):
+        shutil.copy(os.path.join(prev_dir, "images.json.gz"), out)
     json.dump(meta, open(os.path.join(out, "meta.json"), "w"), indent=1); print(meta)
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:6])
+    main(*sys.argv[1:7])

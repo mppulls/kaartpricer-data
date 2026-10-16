@@ -13,6 +13,7 @@ CATALOG = os.path.join(HOME, "catalog.json")
 PRICES = os.path.join(HOME, "prices.json")
 PRODUCTS = os.path.join(HOME, "products.json")
 META = os.path.join(HOME, "meta.json")
+IMAGES = os.path.join(HOME, "images.json")
 LINK = "https://www.cardmarket.com/en/Pokemon/Products?idProduct={pid}&sellerCountry=23&minCondition=2"
 SEARCH = "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString={q}&sellerCountry=23&minCondition=2"
 HEADER = ["Naam", "Set", "Nummer", "Trend", "Opmerking", "Cardmarket (NL, NM)"]
@@ -25,7 +26,7 @@ def setup(repo):
     os.makedirs(HOME, exist_ok=True); repo = os.path.abspath(os.path.expanduser(repo))
     git = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True)
     if git("fetch", "-q", "--depth", "1", "origin", "data").returncode == 0:
-        for name, dest in [("catalog.json.gz", CATALOG), ("prices.json.gz", PRICES), ("products.json.gz", PRODUCTS), ("meta.json", META)]:
+        for name, dest in [("catalog.json.gz", CATALOG), ("prices.json.gz", PRICES), ("products.json.gz", PRODUCTS), ("images.json.gz", IMAGES), ("meta.json", META)]:
             r = git("show", f"FETCH_HEAD:{name}")
             if r.returncode != 0:
                 print("ontbreekt op data branch:", name); continue

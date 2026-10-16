@@ -30,9 +30,10 @@ jobs:
           B=https://downloads.s3.cardmarket.com/productCatalog
           curl -fsSL --retry 3 -o /tmp/prices.json  "$B/priceGuide/price_guide_6.json"        || rm -f /tmp/prices.json
           curl -fsSL --retry 3 -o /tmp/products.json "$B/productList/products_singles_6.json" || rm -f /tmp/products.json
+          curl -fsSL --retry 3 -o /tmp/datas.json https://assets.tcgdex.net/datas.json || rm -f /tmp/datas.json
           ls -la /tmp/*.json
       - name: Compacte bestanden maken
-        run: python3 build/build_data.py /tmp/catalog.json /tmp/prices.json /tmp/products.json /tmp/prev /tmp/out
+        run: python3 build/build_data.py /tmp/catalog.json /tmp/prices.json /tmp/products.json /tmp/prev /tmp/out /tmp/datas.json
       - name: Publiceren op branch data (zonder geschiedenis, zodat de repo klein blijft)
         run: |
           cd /tmp/out

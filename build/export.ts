@@ -10,7 +10,7 @@ for (const region of ["data", "data-asia"]) {
       const c = (await import(path.join(base, rel))).default; const s = c.set ?? {};
       if (s.serie?.id === "tcgp") continue;
       rows.push({
-        region, set_id: s.id ?? null, set_name: s.name?.en ?? s.name?.ja ?? s.name?.["zh-tw"] ?? null,
+        region, serie_id: s.serie?.id ?? null, set_id: s.id ?? null, set_name: s.name?.en ?? s.name?.ja ?? s.name?.["zh-tw"] ?? null,
         set_abbr: s.abbreviations?.official ?? null, set_official: s.cardCount?.official ?? null,
         set_release: typeof s.releaseDate === "string" ? s.releaseDate : (s.releaseDate?.en ?? s.releaseDate?.ja ?? null),
         local_id: path.basename(rel, ".ts"), name: c.name?.en ?? null, names: c.name ?? null,
