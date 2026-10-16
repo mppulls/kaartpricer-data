@@ -286,7 +286,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
       <button class="fchip" id="tabAll" type="button" data-filter="all" aria-pressed="true" hidden>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Lijst</button>
       <button class="fchip warn" id="tabCheck" type="button" data-filter="check" aria-pressed="false" hidden><span class="num" id="checkCnt"></span> controleren</button>
-      <button class="fchip" id="lowBtn" type="button" hidden>Low checken</button>
+      <button class="fchip" id="lowBtn" type="button" hidden>Prijzen checken</button>
       <button class="fchip" id="tabBuy" type="button" data-filter="buy" aria-pressed="false" hidden>Inkopen <span class="num" id="buyCnt"></span></button>
     </div>
   </div>
@@ -1053,12 +1053,11 @@ document.addEventListener("change", e => {
   else if (t.id === "pickCamera" || t.id === "pickGallery") { addFiles(t.files); t.value = ""; }
 });
 $("#trendSw").addEventListener("click", () => setListTrend(!listTrend()));
-$("#sOpen").addEventListener("click", () => {            // meteen langs alle kaarten zonder prijs, zonder keuzescherm
+$("#sOpen").addEventListener("click", () => {            // alleen de kaarten zonder prijs
   const items = [];
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) if (k.sid && priceOf(k, s).src === "open") items.push({ sid: s.id, key: k.k });
   if (!items.length) { toast("Kaarten zonder prijs zijn niet herkend, tik ze aan en kies Andere versies"); return; }
-  const sh = sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close));
-  LOW.vers = false; LOW.run = { items, i: 0, filled: 0, skipped: 0 }; drawLow(sh.el);
+  startLow(items);
 });
 $("#pctBtn").addEventListener("click", () => { const r = $("#pctRow"); r.hidden = !r.hidden; $("#pctBtn").setAttribute("aria-expanded", String(!r.hidden)); r.dataset.p = ""; drawPct(); });
 function setFilter(f) { S.filter = f; document.querySelectorAll("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === f))); window.scrollTo({ top: 0 }); render(); }
@@ -1112,7 +1111,7 @@ function openMenu() {
     <button class="item" data-m="copy"><span class="t"><b>Kopieer lijst</b><small>Als tabel om te plakken</small></span></button>
     <button class="item" data-m="buy"><span class="t"><b>Inkoop opslaan</b><small>De kaarten in je lijst als inkoop bewaren</small></span></button>
     <button class="item" data-m="finish"><span class="t"><b>Dag afronden</b><small>Alle inkopen van vandaag naar je sheet</small></span></button>
-    <button class="item" data-m="low"><span class="t"><b>Low checken</b><small>Loop je kaarten langs en vul de laagste NL prijs in</small></span></button>
+    <button class="item" data-m="low"><span class="t"><b>Prijzen checken</b><small>Alle kaarten langs: Cardmarket openen en prijs invullen</small></span></button>
     <button class="item" data-m="add"><span class="t"><b>Zoek een kaart</b><small>${listTrend() ? "Trend en Cardmarket direct" : "Cardmarket direct"}, of toevoegen aan je lijst</small></span></button>
     <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
     ${STANDALONE ? `<button class="item" data-m="import"><span class="t"><b>Lijsten uit Claude importeren</b><small>Eenmalig, je lijsten en inkopen uit de Claude versie</small></span></button>` : ""}
@@ -1213,43 +1212,27 @@ async function addManual(card) {
   try { await putScan(s); } catch { toast("Opslaan mislukt"); }
 }
 
-/* low modus: zelf opzoeken op Cardmarket, de app zet de kaarten klaar */
-const LOW = { min: 2, skipToday: true, run: null };
-try { const j = JSON.parse(localStorage.getItem("kaartscan.low") || "null"); if (j) { LOW.min = j.min ?? 2; LOW.skipToday = j.skipToday ?? true; } } catch {}
+/* prijzen checken: alle kaarten één voor één langs, zelf opzoeken op Cardmarket, de app zet ze klaar */
+const LOW = { run: null };
 function lowCandidates() {
-  const today = new Date().toDateString(); const out = [];
+  const out = [];
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
     if (s.trend === true) continue;                          // foto bewust op trend gezet
-    const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null; if (!card) continue;
-    const t = trendOf(card, k.rev);
-    if (LOW.min > 0 && !(t >= LOW.min)) continue;
-    if (LOW.skipToday && k.lowT && new Date(k.lowT).toDateString() === today) continue;
-    out.push({ sid: s.id, key: k.k });
+    if (k.sid && CAT.byKey.get(k.sid + "|" + k.lid)) out.push({ sid: s.id, key: k.k });
   }
   return out;
 }
-function openLow() {
-  if (!allScans().length) { toast("Scan eerst een paar kaarten"); return; }
+function startLow(items) {
+  if (!items.length) { toast(allScans().length ? "Geen herkende kaarten om te checken" : "Scan eerst een paar kaarten"); return; }
   const sh = sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close));
-  LOW.run = null; LOW.vers = false; drawLow(sh.el);
+  LOW.vers = false; LOW.run = { items, i: 0, filled: 0, skipped: 0 }; drawLow(sh.el);
 }
+function openLow() { startLow(lowCandidates()); }
 function resumeLow() { if (!LOW.run) return; const sh = sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close)); drawLow(sh.el); }
 function lowItem() { const r = LOW.run; if (!r) return null; const it = r.items[r.i]; if (!it) return null; const s = scanById(it.sid); const k = s && s.kaarten.find(x => x.k === it.key); return k ? { s, k } : null; }
 function drawLow(el) {
   const body = $("#lowBody", el); if (!body) return;
-  const r = LOW.run;
-  if (!r) {
-    const n = lowCandidates().length;
-    body.innerHTML = `<div style="display:grid;gap:14px">
-      <h3>Low checken</h3>
-      <p class="fine">Je loopt de kaarten één voor één langs. Open Cardmarket, kijk de laagste NL NM prijs, vul hem in en ga door. Je zoekt zelf, dus er is geen risico op een blokkade.</p>
-      <div class="lbl">Welke kaarten</div>
-      <div class="chips">${[[0, "Alles"], [2, "Trend vanaf € 2"], [5, "vanaf € 5"], [10, "vanaf € 10"], [25, "vanaf € 25"]].map(([v, l]) => `<button class="chip" data-lowmin="${v}" aria-pressed="${LOW.min === v}">${l}</button>`).join("")}</div>
-      <label class="check"><input type="checkbox" id="lowSkip" ${LOW.skipToday ? "checked" : ""}> Kaarten die vandaag al een prijs hebben overslaan</label>
-      <button class="btn primary wide" data-low="start" ${n ? "" : "disabled"}>${n ? `Start met ${n} ${n === 1 ? "kaart" : "kaarten"}` : "Geen kaarten met deze keuze"}</button>
-    </div>`;
-    return;
-  }
+  const r = LOW.run; if (!r) return;
   const cur = lowItem();
   if (!cur) {
     body.innerHTML = `<div style="display:grid;gap:14px"><h3>Klaar</h3><p>${r.filled} ${r.filled === 1 ? "prijs" : "prijzen"} ingevuld, ${r.skipped} overgeslagen.</p><button class="btn primary wide" data-low="close">Terug naar de lijst</button></div>`;
@@ -1275,12 +1258,8 @@ function drawLow(el) {
 }
 async function lowClick(e, close) {
   const el = $(".sheet");
-  const mn = e.target.closest("[data-lowmin]");
-  if (mn) { LOW.min = Number(mn.dataset.lowmin); saveLowPrefs(); drawLow(el); return; }
-  if (e.target.id === "lowSkip") { LOW.skipToday = e.target.checked; saveLowPrefs(); drawLow(el); return; }
   const b = e.target.closest("[data-low]"); if (!b) return;
   const a = b.dataset.low, r = LOW.run;
-  if (a === "start") { LOW.run = { items: lowCandidates(), i: 0, filled: 0, skipped: 0 }; drawLow(el); return; }
   if (a === "close") { LOW.run = null; close(); render(); return; }
   if (a === "opened") { if (r) r.opened = true; return; }
   if (!r) return;
@@ -1297,7 +1276,6 @@ async function lowClick(e, close) {
   if (a === "skip") { r.skipped++; r.i++; drawLow(el); return; }
   if (a === "prev") { r.i = Math.max(0, r.i - 1); drawLow(el); return; }
 }
-function saveLowPrefs() { try { localStorage.setItem("kaartscan.low", JSON.stringify({ min: LOW.min, skipToday: LOW.skipToday })); } catch {} }
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "lowIn") { e.preventDefault(); const b = $("[data-low='save']"); if (b) b.click(); } });
 const refocusLow = () => { if (document.visibilityState === "visible" && LOW.run) { const i = $("#lowIn"); if (i && !i.value) setTimeout(() => i.focus(), 120); } };
 document.addEventListener("visibilitychange", refocusLow); window.addEventListener("focus", refocusLow);
