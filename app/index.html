@@ -168,6 +168,8 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 /* vellen */
 .sheet { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; background: var(--shade); }
 .sheet > div { background: var(--surface); border-radius: 20px 20px 0 0; max-height: 86vh; overflow: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; max-width: 640px; width: 100%; margin: 0 auto; }
+.sheet.top { align-items: start; }
+.sheet.top > div { border-radius: 0 0 20px 20px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); max-height: 78vh; }
 .sheet h3 { margin: 0; font-size: 17px; }
 .sheet .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); text-align: left; width: 100%; }
 .sheet .item .t { flex: 1; min-width: 0; }
@@ -210,6 +212,12 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
+.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
+.srow .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .sp { text-align: right; } .srow .sp b { display: block; font-size: 15px; } .srow .sp small { color: var(--muted); font-size: 11px; }
+.sbtn { background: var(--surface); width: 36px; height: 36px; color: var(--accent); }
+.sbtn.add { background: var(--accent); color: var(--accent-ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
@@ -219,6 +227,7 @@ main .wrap { padding-block: 14px; display: grid; gap: 14px; }
       <button class="listbtn" id="listBtn" type="button" aria-label="Kies lijst"><span id="listName">Kaartscan</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
       <span class="spacer"></span>
+      <button class="iconbtn" id="searchBtn" type="button" aria-label="Zoek een kaart"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
       <button class="lowbtn" id="lowBtn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Low</button>
       <button class="iconbtn" id="menuBtn" type="button" aria-label="Menu">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
@@ -793,6 +802,7 @@ function cardHtml(s, k) {
 }
 function shortRar(r) {
   const m = { "special illustration rare": "SIR", "illustration rare": "IR", "ultra rare": "Full art", "hyper rare": "Gold", "secret rare": "Secret", "shiny rare": "Shiny", "shiny ultra rare": "Shiny full art", "promo": "Promo", "black white rare": "BW rare", "mega hyper rare": "Mega gold", "mega attack rare": "Mega attack" };
+  if (!r || r.toLowerCase() === "none") return "";
   return m[r.toLowerCase()] || r;
 }
 function detailHtml(s, k, card, own) {
@@ -866,13 +876,14 @@ $("#pctBtn").addEventListener("click", () => { const r = $("#pctRow"); r.hidden 
 function setFilter(f) { S.filter = f; document.querySelectorAll("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === f))); window.scrollTo({ top: 0 }); render(); }
 document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => setFilter(b.dataset.filter)));
 $("#buyBtn").addEventListener("click", () => openBuySheet());
+$("#searchBtn").addEventListener("click", () => openSearch(null, null));
 $("#listBtn").addEventListener("click", openLists);
 $("#lowBtn").addEventListener("click", () => openLow());
 $("#menuBtn").addEventListener("click", openMenu);
 
 /* vellen */
-function sheet(html, onClick) {
-  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div>${html}</div></div>`;
+function sheet(html, onClick, opts = {}) {
+  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet${opts.top ? " top" : ""}" role="dialog" aria-modal="true"><div>${html}</div></div>`;
   const el = host.firstElementChild;
   el.addEventListener("click", e => { if (e.target === el) close(); else onClick && onClick(e, close); });
   function close() { host.innerHTML = ""; }
@@ -909,7 +920,7 @@ function openMenu() {
     <button class="item" data-m="buy"><span class="t"><b>Inkoop opslaan</b><small>De kaarten in je lijst als inkoop bewaren</small></span></button>
     <button class="item" data-m="finish"><span class="t"><b>Dag afronden</b><small>Alle inkopen van vandaag naar je sheet</small></span></button>
     <button class="item" data-m="low"><span class="t"><b>Low checken</b><small>Loop je kaarten langs en vul de laagste NL prijs in</small></span></button>
-    <button class="item" data-m="add"><span class="t"><b>Kaart toevoegen</b><small>Zoek op naam en nummer</small></span></button>
+    <button class="item" data-m="add"><span class="t"><b>Zoek een kaart</b><small>Trend en Cardmarket direct, of toevoegen aan je lijst</small></span></button>
     <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
     <p class="fine">Trend is de Cardmarket trendprijs ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) : ""}. Je bod rekent met je eigen prijs, anders je CM low NL, anders de trend. Dat is niet de laagste NL NM aanbieding: tik een kaart aan en open Cardmarket om die te zien.</p>`,
     (e, close) => {
@@ -929,31 +940,67 @@ function openScanMenu(sId) {
       else { await deleteScanDoc(s).catch(() => toast("Verwijderen mislukt")); render(); }
     });
 }
-function searchCards(q) {
-  const tok = norm(q); if (!tok.length) return [];
-  const nums = tok.filter(t => /\d/.test(t)), words = tok.filter(t => !/^\d+$/.test(t));
+function searchCards(q) { const r = searchPass(q, false); return r.length ? r : searchPass(q, true); }
+function wordHit(t, w, fuzzy) {
+  if (t.startsWith(w)) return true;
+  if (w.length > 3 && w.endsWith("s") && t.startsWith(w.slice(0, -1))) return true;     // lillies, rockets
+  return fuzzy && w.length >= 4 && sim(t.slice(0, Math.max(w.length, t.length)), w) >= 0.75;
+}
+function searchPass(q, fuzzy) {
+  const raw = String(q || "").toUpperCase(); let total = null;
+  const m = /([A-Z]*\d+[A-Z]?)\s*\/\s*([A-Z]*\d+)/.exec(raw); if (m && /^\d+$/.test(m[2])) total = parseInt(m[2], 10);
+  const tok = norm(m ? raw.replace(m[0], " " + m[1] + " ") : raw); if (!tok.length) return [];
+  const nums = tok.filter(t => /\d/.test(t) && !CAT.sets.some(st => (st.code || "").toLowerCase() === t)), words = tok.filter(t => !nums.includes(t));
   const res = [];
   for (const c of CAT.cards) {
-    if (words.length && !words.every(w => c.nn.includes(w) || (c.set.code || "").toLowerCase() === w)) continue;
+    const nt = c.nn.split(" "), code = (c.set.code || "").toLowerCase(), sname = c.set.name.toLowerCase();
+    let viaName = 0, ok = true;
+    for (const w of words) {
+      if (nt.some(t => wordHit(t, w, fuzzy))) viaName++;
+      else if (code === w || sname.split(/\s+/).some(t => t.startsWith(w))) continue;
+      else { ok = false; break; }
+    }
+    if (!ok) continue;
     if (nums.length && !nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid)) continue;
-    res.push(c); if (res.length > 400) break;
+    if (total && c.set.total !== total) continue;
+    if (!words.length && !nums.length) continue;
+    const nameWords = words.filter(w => nt.some(t => wordHit(t, w, fuzzy))).join(" ");
+    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + (nums.length ? 2 : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
+    res.push([score, c]);
   }
-  return res.sort((a, b) => (b.set.rel || "").localeCompare(a.set.rel || "")).slice(0, 40);
+  return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
 }
+function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&sellerCountry=23&minCondition=2`; }
 function openSearch(sId, key) {
   const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
-  const sh = sheet(`<h3>${k0 ? "Kies de juiste kaart" : "Kaart toevoegen"}</h3>
-    <input class="field" id="q" placeholder="Naam en eventueel nummer, bijv. mew ex 205" value="${esc(k0 ? k0.lez.name : "")}" autocomplete="off">
+  const start = k0 ? k0.lez.name : (S.lastQ || "");
+  const sh = sheet(`<h3>${k0 ? "Kies de juiste kaart" : "Zoek een kaart"}</h3>
+    <input class="field" id="q" type="search" placeholder="Naam, nummer of set, bijv. mew ex 205 of pfl 125" value="${esc(start)}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
     <div id="res" style="display:grid;gap:8px"></div>`,
     async (e, close) => {
-      const it = e.target.closest("[data-key]"); if (!it) return;
+      const add = e.target.closest("[data-add]");
+      if (add) { const card = CAT.byKey.get(add.dataset.add); await addManual(card); toast(`${card.name} toegevoegd aan je lijst`); return; }
+      const it = e.target.closest("[data-key]"); if (!it || !k0) return;
       const card = CAT.byKey.get(it.dataset.key); close();
-      if (k0) editCard(sId, key, k => { k.sid = card.sid; k.lid = card.lid; k.st = "ok"; });
-      else addManual(card);
-    });
-  const q = $("#q", sh.el), res = $("#res", sh.el);
-  const run = () => { res.innerHTML = searchCards(q.value).map(c => `<button class="item" data-key="${esc(c.key)}"><span class="t"><b>${esc(c.name)}</b><small>${esc(c.set.name)} · <span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span> · ${esc(shortRar(c.rar || ""))}</small></span><span class="num fine">${trendOf(c) ? EUR.format(trendOf(c)) : ""}</span></button>`).join("") || `<p class="fine">Typ een naam, eventueel met nummer.</p>`; };
-  q.addEventListener("input", run); run(); setTimeout(() => q.focus(), 50);
+      editCard(sId, key, k => { k.sid = card.sid; k.lid = card.lid; k.st = "ok"; });
+    }, { top: true });
+  const q = $("#q", sh.el), res = $("#res", sh.el); let timer = null;
+  const row = c => {
+    const t = trendOf(c, false), r = trendOf(c, true);
+    const info = `<span class="t"><b>${esc(c.name)}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
+      <span class="sp num"><b>${t ? EUR.format(t) : "€ ?"}</b>${r ? `<small>rev ${EUR.format(r)}</small>` : ""}</span>`;
+    if (k0) return `<button class="item srow pick" data-key="${esc(c.key)}">${info}</button>`;
+    return `<div class="item srow">${info}
+      <a class="iconbtn sbtn" href="${cmFor(c)}" target="cardmarket" aria-label="Open ${esc(c.name)} op Cardmarket"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+      <button class="iconbtn sbtn add" data-add="${esc(c.key)}" aria-label="Voeg ${esc(c.name)} toe aan je lijst"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>`;
+  };
+  const run = () => {
+    if (!k0) S.lastQ = q.value;
+    const list = searchCards(q.value);
+    res.innerHTML = list.map(row).join("") || `<p class="fine">${q.value.trim() ? "Niets gevonden. Probeer alleen de naam, of naam en nummer." : "Typ een naam, eventueel met nummer of setcode."}</p>`;
+  };
+  q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 90); });
+  run(); setTimeout(() => { q.focus(); q.select(); }, 50);
 }
 async function addManual(card) {
   const list = await ensureList();
