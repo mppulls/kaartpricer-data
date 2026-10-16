@@ -221,20 +221,18 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .buyrow img, .buyrow .ph { width: 34px; height: 48px; border-radius: 4px; object-fit: cover; background: var(--surface-2); }
 .buyrow b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .buyrow small { color: var(--muted); font-size: 12px; }
-.lowsheet { min-height: 70vh; }
+.sheet.low > div { max-height: 92vh; }      /* bovenin: het toetsenbord komt eronder en duwt niets weg */
 .lowhead { display: flex; align-items: center; gap: 10px; }
 .lowhead .prog { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .lowhead .prog i { display: block; height: 100%; background: var(--accent); }
-.lowcard { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; }
-.lowcard img, .lowcard .ph { width: 96px; height: 134px; border-radius: 7px; object-fit: cover; background: var(--surface-2); display: block; }
+.lowcard { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; align-items: center; }
+.lowcard img, .lowcard .ph { width: 72px; height: 100px; border-radius: 7px; object-fit: cover; background: var(--surface-2); display: block; }
 .lowcard b { font-size: 18px; display: block; }
 .lowcard .fine { margin-top: 4px; }
 .bigin { width: 100%; height: 58px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); padding: 0 16px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .bigin:focus { border-color: var(--accent); outline: none; }
 .btn.wide { width: 100%; height: 50px; justify-content: center; font-size: 16px; border-radius: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.check { display: flex; gap: 10px; align-items: center; font-size: 14px; }
-.check input { width: 20px; height: 20px; accent-color: var(--accent); }
 .sheet .item.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
 .sheet .item.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
 .srow .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1077,9 +1075,9 @@ $("#menuBtn").addEventListener("click", openMenu);
 
 /* vellen */
 function sheet(html, onClick, opts = {}) {
-  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet${opts.top ? " top" : ""}" role="dialog" aria-modal="true"><div>${html}</div></div>`;
+  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet${opts.top ? " top" : ""}${opts.cls ? " " + opts.cls : ""}" role="dialog" aria-modal="true"><div>${html}</div></div>`;
   const el = host.firstElementChild;
-  el.addEventListener("click", e => { if (e.target === el) close(); else onClick && onClick(e, close); });
+  el.addEventListener("click", e => { if (e.target === el) { if (!opts.sticky) close(); } else onClick && onClick(e, close); });
   function close() { host.innerHTML = ""; const f = opts.onClose; opts.onClose = null; if (f) f(); }
   return { el, close };
 }
@@ -1231,11 +1229,11 @@ function lowCandidates() {
 }
 function startLow(items) {
   if (!items.length) { toast(allScans().length ? "Geen herkende kaarten om te checken" : "Scan eerst een paar kaarten"); return; }
-  const sh = sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close));
-  LOW.vers = false; LOW.run = { items, i: 0, filled: 0, skipped: 0 }; drawLow(sh.el);
+  LOW.vers = false; LOW.run = { items, i: 0, filled: 0, skipped: 0 }; drawLow(lowSheet().el);
 }
 function openLow() { startLow(lowCandidates()); }
-function resumeLow() { if (!LOW.run) return; const sh = sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close)); drawLow(sh.el); }
+const lowSheet = () => sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close), { top: true, sticky: true, cls: "low" });
+function resumeLow() { if (!LOW.run) return; drawLow(lowSheet().el); }
 function lowItem() { const r = LOW.run; if (!r) return null; const it = r.items[r.i]; if (!it) return null; const s = scanById(it.sid); const k = s && s.kaarten.find(x => x.k === it.key); return k ? { s, k } : null; }
 function drawLow(el) {
   const body = $("#lowBody", el); if (!body) return;
