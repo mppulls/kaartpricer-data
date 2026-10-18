@@ -156,6 +156,8 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .nextbtn { width: 44px; height: 40px; border-radius: 11px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
 .nextbtn:active { transform: scale(.95); }
 .vers { display: grid; gap: 8px; justify-items: start; }
+.btn.vbtn { font-size: 15px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.linkbtn.vlink { font-size: 15px; font-weight: 700; padding: 6px 0; }
 .own.pctown input { padding: 0 6px; text-align: center; }
 .setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 .setrow .t { min-width: 0; } .setrow .t b { display: block; font-size: 14px; } .setrow .t small { display: block; color: var(--muted); font-size: 12px; }
@@ -937,7 +939,7 @@ function versionsOf(k, card) {
   const push = c => { if (c && !seen.has(c.key)) { seen.add(c.key); out.push(c); } };
   (k.alts || []).forEach(([sid, lid]) => push(CAT.byKey.get(sid + "|" + lid)));
   if (card) (CAT.byName.get(card.nn) || []).slice().sort((a, b) => (b.sid === card.sid) - (a.sid === card.sid) || (b.set.rel || "").localeCompare(a.set.rel || "")).forEach(push);
-  return out.slice(0, 12);
+  return out.slice(0, 4);
 }
 function versHtml(k, card, pickAttrs, searchAttrs, showT) {
   const vs = versionsOf(k, card);
@@ -968,7 +970,7 @@ function detailHtml(s, k, card, own) {
   h += `<div class="actions">
     ${card ? `<a class="btn primary" href="${cmFor(card)}" target="cardmarket">${pid ? "Cardmarket NL NM" : "Zoek op Cardmarket"}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
     <button class="btn" data-act="rev" ${ids} aria-pressed="${k.rev}">Reverse</button>
-    <button class="btn" data-act="vers" ${ids} aria-pressed="${vOpen}" aria-expanded="${vOpen}">Andere versies</button>
+    <button class="btn vbtn" data-act="vers" ${ids} aria-pressed="${vOpen}" aria-expanded="${vOpen}">Andere versies</button>
     <button class="btn danger" data-act="del" ${ids}>Verwijder</button></div>`;
   if (vOpen) h += versHtml(k, card, `data-act="pick" ${ids}`, `data-act="search" ${ids}`, trendOn(s));
   return h + `</div>`;
@@ -1045,7 +1047,7 @@ function goNext(sId, key) {
   if (inp) inp.focus();
 }
 document.addEventListener("focusin", e => { const a = e.target.dataset && e.target.dataset.act; if (FIELD[a]) S.lastField = FIELD[a]; });
-document.addEventListener("mousedown", e => { if (e.target.closest(".nextbtn")) e.preventDefault(); });   // veld houdt focus, toetsenbord blijft open
+document.addEventListener("mousedown", e => { if (e.target.closest(".nextbtn, [data-add]")) e.preventDefault(); });   // veld houdt focus, toetsenbord blijft open
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.matches("[data-act='low']")) { e.preventDefault(); goNext(e.target.dataset.s, e.target.dataset.k); return; }
   if (e.key === "Enter" && e.target.matches("[data-act='kpct'], #spIn")) e.target.blur();
@@ -1146,7 +1148,31 @@ function openScanMenu(sId) {
     });
   sh.el.addEventListener("change", e => { if (e.target.id !== "spIn") return; const v = parsePct(e.target.value); if (v == null) return; sh.close(); setScanPct(sId, v); });
 }
-function searchCards(q) { const r = searchPass(q, false); return r.length ? r : searchPass(q, true); }
+/* setcode en nummer aan elkaar ('AQ41', 'evo101') zoeken als 'AQ 41'. Waar de letters ook een nummer-voorvoegsel kunnen zijn
+   (SV41, XY35), komen beide uitleggingen mee, de nummer-uitleg eerst */
+let CODESET = null, LIDPRE = null;
+function splitQuery(q) {
+  if (!CODESET) {
+    CODESET = new Set(CAT.sets.map(st => (st.code || "").toLowerCase()).filter(Boolean));
+    LIDPRE = new Set(CAT.cards.map(c => (/^([A-Za-z]+)\d/.exec(c.lid) || [])[1]).filter(Boolean).map(x => x.toLowerCase()));
+  }
+  let changed = false, clash = false;
+  const out = String(q || "").replace(/\b([A-Za-z]{2,4})(\d{1,3}[A-Za-z]?)\b/g, (m, a, n) => {
+    const k = a.toLowerCase(); if (!CODESET.has(k)) return m;
+    changed = true; if (LIDPRE.has(k)) clash = true; return a + " " + n;
+  });
+  return { q: out, changed, clash };
+}
+function searchCards(q) {
+  const sp = splitQuery(q);
+  const pass = fz => {
+    if (!sp.changed) return searchPass(q, fz);
+    const a = searchPass(sp.q, fz), b = searchPass(q, fz), seen = new Set(), out = [];
+    for (const c of sp.clash ? [...b, ...a] : [...a, ...b]) if (!seen.has(c.key)) { seen.add(c.key); out.push(c); }
+    return out.slice(0, 50);
+  };
+  const r = pass(false); return r.length ? r : pass(true);
+}
 function wordHit(t, w, fuzzy) {
   if (t.startsWith(w)) return true;
   if (w.length > 3 && w.endsWith("s") && t.startsWith(w.slice(0, -1))) return true;     // lillies, rockets
@@ -1160,10 +1186,11 @@ function searchPass(q, fuzzy) {
   const res = [];
   for (const c of CAT.cards) {
     const nt = c.nn.split(" "), code = (c.set.code || "").toLowerCase(), sname = c.set.name.toLowerCase();
-    let viaName = 0, ok = true;
+    let viaName = 0, viaCode = 0, ok = true;
     for (const w of words) {
       if (nt.some(t => wordHit(t, w, fuzzy))) viaName++;
-      else if (code === w || sname.split(/\s+/).some(t => t.startsWith(w))) continue;
+      else if (code === w) viaCode++;                                    // exacte setcode weegt zwaarder dan een stukje setnaam
+      else if (sname.split(/\s+/).some(t => t.startsWith(w))) continue;
       else { ok = false; break; }
     }
     if (!ok) continue;
@@ -1171,7 +1198,7 @@ function searchPass(q, fuzzy) {
     if (total && c.set.total !== total) continue;
     if (!words.length && !nums.length) continue;
     const nameWords = words.filter(w => nt.some(t => wordHit(t, w, fuzzy))).join(" ");
-    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + (nums.length ? 2 : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
+    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + 5 * viaCode + (nums.length ? 2 : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
     res.push([score, c]);
   }
   return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
@@ -1187,7 +1214,10 @@ function openSearch(sId, key, opts = {}) {
     <div id="res" style="display:grid;gap:8px"></div>`,
     async (e, close) => {
       const add = e.target.closest("[data-add]");
-      if (add) { const card = CAT.byKey.get(add.dataset.add); await addManual(card); toast(`${card.name} toegevoegd aan je lijst`); return; }
+      if (add) {                                                        // toevoegen en meteen klaar voor de volgende zoekopdracht
+        const card = CAT.byKey.get(add.dataset.add); q.value = ""; S.lastQ = ""; run(); q.focus();
+        await addManual(card); toast(`${card.name} toegevoegd aan je lijst`); return;
+      }
       const it = e.target.closest("[data-key]"); if (!it || !k0) return;
       pickVersion(sId, key, it.dataset.key); close();
     }, { top: true, onClose: opts.onClose });
@@ -1253,7 +1283,7 @@ function drawLow(el) {
     <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : (refImg(card, "ph") || `<span class="ph"></span>`)}
       <div><b>${esc(card.name)}${k.rev ? " (reverse)" : ""}</b><span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span> <span class="tag">${esc(shortRar(card.rar || ""))}</span>
       <div class="fine">${esc(card.set.name)}</div><div class="fine num">${[trendOn(s) ? `Trend ${t ? EUR.format(t) : "onbekend"}` : "", Number.isFinite(k.low) && k.low !== null ? `vorige prijs ${EUR.format(k.low)}` : ""].filter(Boolean).join(" · ")}</div>
-      <button class="linkbtn" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button></div></div>
+      <button class="linkbtn vlink" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button></div></div>
     ${LOW.vers ? versHtml(k, card, `data-low="pick"`, `data-low="search"`, trendOn(s)) : ""}
     <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">${pid ? "Open Cardmarket NL NM" : "Zoek op Cardmarket"}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
