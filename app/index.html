@@ -263,6 +263,12 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .cam .done { justify-self: end; color: #fff; font-weight: 700; font-size: 16px; }
 .cam .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; }
 .cam .flash.on { opacity: .7; transition: none; }
+.cam .camerr { grid-row: 1; grid-column: 1; align-self: center; justify-self: center; z-index: 2; display: grid; gap: 10px; justify-items: center; background: rgba(0,0,0,.78); padding: 20px; border-radius: 16px; text-align: center; }
+.cam .camerr[hidden] { display: none; }
+.cam .camerr p { margin: 0 0 4px; font-weight: 600; }
+.cam .torch { grid-row: 1; grid-column: 1; align-self: start; justify-self: end; z-index: 2; margin: calc(14px + env(safe-area-inset-top, 0px)) 14px 0 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; display: grid; place-items: center; }
+.cam .torch[aria-pressed="true"] { background: #ffd54a; color: #000; }
+.cam .native { grid-row: 1; grid-column: 1; align-self: start; justify-self: start; z-index: 2; margin: calc(18px + env(safe-area-inset-top, 0px)) 0 0 16px; padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font-size: 13px; font-weight: 600; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
@@ -452,11 +458,13 @@ function identify(r) {
   const { total } = parseNumber(r.number);
   if (code) { const f = c.filter(x => x.set.code.toUpperCase() === code); if (f.length) c = f; }
   if (total) { const f = c.filter(x => x.set.total === total); if (f.length) c = f; }
+  const beforeArt = c;
   if (r.art && c.length > 1) {
     const f = r.art === "full" ? c.filter(x => !x.plain) : c.filter(x => x.plain || x.promo);
     if (f.length) c = f;
   }
-  if (c.length === 1) return { st: "ok", card: c[0], alts: [] };
+  if (c.length === 1) return beforeArt.length === 1 ? { st: "ok", card: c[0], alts: [] }     // alleen door 'full art' uniek: nummer laten bevestigen
+    : { st: "check", card: c[0], alts: beforeArt.filter(x => x !== c[0]).slice(0, 8) };
   c = [...c].sort((a, b) => (b.set.rel || "").localeCompare(a.set.rel || ""));
   let pick = c[0]; const sv = stickerValue(r.sticker);
   if (sv) {
@@ -625,13 +633,50 @@ Write exactly one line of JSON per card and nothing else (no code fence, no comm
 box: the card outline as fractions (0 to 1) of the photo width and height.
 name: exactly as printed, with ex, V, VMAX, VSTAR, GX and owner prefixes such as N's, Misty's or Team Rocket's. Trainers and energy: the card title.
 hp: the number, or null. attacks: up to two ability or attack names as printed.
-set and number: the set code and card number from the bottom left print line (like "MEW" and "205/165", or "SVP" and "053"), only if you can really read them, else null. Never guess.
+set and number: from the small print along the bottom edge. Newer cards (Sword & Shield, Scarlet & Violet, Mega Evolution) print a letter code and number bottom left, like "MEW" and "205/165" or "SVP" and "053". Older cards (Sun & Moon, XY, Black & White and earlier) print only a set symbol and the number, usually bottom right, like "101/108": then set is null. Only fill them in if you can really read them, else null. Never guess.
 art: "full" when the artwork covers the whole card (illustration rare, full art, special illustration rare, gold), else "regular".
 lang: the card language as a code, like "en", "ja", "ko", "de".
 sticker: the text of a price sticker on the sleeve, else null.`;
-const STEP2 = `Each image is one Pokémon card. Read only the small print line at the bottom left of the card: the set code (letters such as MEW, PAF, SVP, MEP, JTG, often followed by EN) and the card number (like 205/165, TG13/TG30, SWSH291 or 053).
-Write exactly one line of JSON per image, in image order, and nothing else: {"i":0,"set":"MEW","number":"205/165"}
-Use null for anything you cannot read with certainty. Never guess.`;
+const STEP2 = `Each image holds one or more horizontal strips. Every strip is the bottom edge of one Pokémon card and has a yellow label #1, #2 and so on in its top left corner.
+For every strip, read the collector number printed along the bottom edge of the card.
+Newer cards print it bottom left, after a letter set code such as MEW, PAF, OBF, SVP, MEP, JTG (often followed by EN).
+Older cards (Sun & Moon, XY, Black & White and earlier) print it bottom right next to a set symbol, without a letter code.
+Formats look like 101/108, 205/165, 053, TG13/TG30, SV41/SV94, RC5/RC32, GG01/GG70, SWSH291, XY121, BW45, SM210.
+Write exactly one line of JSON per strip and nothing else: {"i":1,"set":"MEW","number":"205/165"}
+set is the letter code only when one is printed, else null. Use null for anything you cannot read with certainty. Never guess.`;
+/* stap 2: alleen de onderrand van elke kaart, scherp en met wat extra contrast, drie per afbeelding. Weinig tokens, wel goed leesbaar. */
+const STRIP_W = 1000, STRIP_H = 300, STRIP_GAP = 16, STRIPS_PER_IMG = 3;
+function autoLevels(g, w, h) {                                        // donkere of flauwe foto: grijswaarden oprekken
+  const d = g.getImageData(0, 0, w, h), a = d.data, hist = new Uint32Array(256); let n = 0;
+  for (let i = 0; i < a.length; i += 16) { hist[(a[i] * 77 + a[i + 1] * 150 + a[i + 2] * 29) >> 8]++; n++; }
+  let lo = 0, hi = 255, acc = 0;
+  for (; lo < 254; lo++) { acc += hist[lo]; if (acc > n * 0.01) break; }
+  acc = 0; for (; hi > 1; hi--) { acc += hist[hi]; if (acc > n * 0.01) break; }
+  if (hi - lo < 30 || (lo <= 10 && hi >= 245)) return;
+  const sc = 255 / (hi - lo);
+  for (let i = 0; i < a.length; i += 4) { a[i] = (a[i] - lo) * sc; a[i + 1] = (a[i + 1] - lo) * sc; a[i + 2] = (a[i + 2] - lo) * sc; }
+  g.putImageData(d, 0, 0);
+}
+function stripCanvas(bm, box, dim) {
+  const p = boxPx(bm, box, 0.03, dim); if (!p) return null;
+  const [x, y, w, h] = p, rh = Math.min(h, w * 0.3);
+  const c = canvasOf(STRIP_W, STRIP_H), g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+  g.drawImage(bm, x, y + h - rh, w, rh, 0, 0, STRIP_W, STRIP_H); autoLevels(g, STRIP_W, STRIP_H); return c;
+}
+async function stripImages(bm, ks, dim) {
+  const out = [];
+  for (let i = 0; i < ks.length; i += STRIPS_PER_IMG) {
+    const part = ks.slice(i, i + STRIPS_PER_IMG);
+    const c = canvasOf(STRIP_W, part.length * STRIP_H + (part.length - 1) * STRIP_GAP), g = c.getContext("2d");
+    g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+    part.forEach((k, j) => {
+      const y = j * (STRIP_H + STRIP_GAP), sc = stripCanvas(bm, k.box, dim); if (sc) g.drawImage(sc, 0, y);
+      g.fillStyle = "#ffe14d"; g.fillRect(0, y, 70, 42); g.fillStyle = "#000"; g.font = "bold 32px sans-serif"; g.fillText("#" + (i + j + 1), 6, y + 33);
+    });
+    out.push(await toBlob(c, 0.9));
+  }
+  return out;
+}
 
 function parseLine(line) {
   const s = line.trim().replace(/^```(json)?/, "").replace(/```$/, "").replace(/^[-*\d.)\s]+(?=\{)/, "").replace(/,$/, "");
@@ -691,7 +736,8 @@ async function runJob(job) {
     if (pending.trim()) take(pending);
     if (!s.kaarten.length) { s.status = "leeg"; s._v++; await persist(s); return; }
     const need = s.kaarten.filter(k => k.st !== "ok" && k.box && !k.lang);
-    if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need, job.tier); }
+    if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need); }
+    if (IMG_ON) await visualOrder(s, bm).catch(() => {});
     s.status = "klaar"; s.n = s.kaarten.length; s._v++; render();
     await shrinkKept(s.id, bm);
     await persist(s);
@@ -702,23 +748,53 @@ async function runJob(job) {
     s._v++; render();
   }
 }
-async function readNumbers(s, bm, need, tier) {
+async function readNumbers(s, bm, need) {
+  const ks = need.filter(k => k.box); if (!ks.length) return;
+  const imgs = await stripImages(bm, ks, s.dim);
   const max = (S.limits && S.limits.images && S.limits.images.maxCount) || 5;
-  for (let i = 0; i < need.length; i += max) {
-    const part = need.slice(i, i + max);
-    const blobs = []; for (const k of part) { const c = cropCanvas(bm, k.box, 0.06, 1100, s.dim); blobs.push(c ? await toBlob(c, 0.88) : null); }
-    const items = part.map((k, j) => ({ k, b: blobs[j] })).filter(x => x.b);
-    if (!items.length) continue;
-    try {
-      const { text } = await S.sample(STEP2, { images: items.map(x => x.b), modelTier: tier });
+  for (let i = 0; i < imgs.length; i += max) {
+    try {                                                              // kleine plaatjes, dus het nauwkeurige model kost weinig
+      const { text } = await S.sample(STEP2, { images: imgs.slice(i, i + max), modelTier: "default", effort: "low" });
       text.split("\n").map(parseLine).filter(Boolean).forEach(r => {
-        const it = items[Number(r.i)]; if (!it) return;
-        const k = it.k; if (r.set) k.lez.set = r.set; if (r.number) k.lez.number = r.number;
+        const k = ks[Number(r.i) - 1]; if (!k) return;
+        if (r.set) k.lez.set = r.set; if (r.number) k.lez.number = r.number;
         applyId(k, identify(k.lez));
       });
       s._v++; render();
     } catch (e) { if (e && (e.code === "not_granted" || e.code === "rate_limited")) throw e; }
   }
+}
+/* twijfel tussen versies (gewoon, full art, andere set): vergelijk de kaart op de foto met de echte scans. Kost geen tokens.
+   Kleur en opbouw op 12 bij 16 vlakjes, per kleurkanaal genormaliseerd zodat licht en witbalans weinig uitmaken. */
+const REF = new Map();
+function featOf(src, x, y, w, h) {
+  const ix = w * 0.07, iy = h * 0.05, c = canvasOf(12, 16), g = c.getContext("2d");
+  g.drawImage(src, x + ix, y + iy, w - 2 * ix, h - 2 * iy, 0, 0, 12, 16);
+  const d = g.getImageData(0, 0, 12, 16).data, n = 192, f = new Float32Array(n * 3);
+  for (let ch = 0; ch < 3; ch++) {
+    let m = 0; for (let i = 0; i < n; i++) m += d[i * 4 + ch]; m /= n;
+    let v = 0; for (let i = 0; i < n; i++) v += (d[i * 4 + ch] - m) ** 2; const sd = Math.sqrt(v / n) || 1;
+    for (let i = 0; i < n; i++) f[ch * n + i] = (d[i * 4 + ch] - m) / sd;
+  }
+  return f;
+}
+function refFeat(card) {
+  if (!REF.has(card.key)) REF.set(card.key, (async () => { const img = new Image(); img.src = imgOf(card); await img.decode(); return featOf(img, 0, 0, img.naturalWidth, img.naturalHeight); })().catch(() => null));
+  return REF.get(card.key);
+}
+async function visualOrder(s, bm) {
+  await Promise.all(s.kaarten.map(async k => {
+    if (k.st !== "check" || !k.box || !k.sid) return;
+    const all = [CAT.byKey.get(k.sid + "|" + k.lid), ...(k.alts || []).map(([a, b]) => CAT.byKey.get(a + "|" + b))].filter(Boolean);
+    const cands = all.filter(c => imgOf(c)).slice(0, 6); if (cands.length < 2) return;
+    const p = boxPx(bm, k.box, 0, s.dim); if (!p) return;
+    const uf = featOf(bm, ...p);
+    const scored = (await Promise.all(cands.map(async c => { const f = await refFeat(c); if (!f) return null; let d = 0; for (let i = 0; i < f.length; i++) d += (f[i] - uf[i]) ** 2; return [d / f.length, c]; }))).filter(Boolean).sort((a, b) => a[0] - b[0]);
+    if (scored.length < 2 || !(scored[0][0] < scored[1][0] * 0.85)) return;   // alleen bij een duidelijk verschil
+    const order = [...scored.map(x => x[1]), ...all.filter(c => !scored.some(x => x[1] === c))];
+    k.sid = order[0].sid; k.lid = order[0].lid; k.alts = order.slice(1, 9).map(c => [c.sid, c.lid]);
+  }));
+  s._v++; render();
 }
 async function persist(s) {
   if (!S.db && !S.local) return;
@@ -1523,30 +1599,75 @@ function toast(msg, ms = 3200, action) {
   clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms);
 }
 
-/* ---------------------------------------------------------------- camera met kader (alleen in de losse app) */
+/* ---------------------------------------------------------------- camera met kader (alleen in de losse app)
+   iPhone zet de camera stil zodra de app naar de achtergrond gaat (bijvoorbeeld even naar Cardmarket). Daarom: bij weggaan de camera
+   netjes vrijgeven, bij terugkomen opnieuw starten, een vastgelopen start afbreken en opnieuw proberen, en als het echt niet lukt een
+   knop tonen voor de gewone camera (die mag iPhone alleen openen direct na een tik). */
+const CAM = { stream: null, el: null, starting: false, torch: false };
+function stopCam() { if (CAM.stream) { CAM.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); CAM.stream = null; } }
+function withTimeout(p, ms) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]); }
+async function getStream() {
+  stopCam();
+  // 4:3 zoals de fotocamera zelf: rechtop gehouden meer pixels per kaart dan breedbeeld, dus scherpere nummers
+  const best = { video: { facingMode: { ideal: "environment" }, width: { ideal: 4032 }, height: { ideal: 3024 }, aspectRatio: { ideal: 4 / 3 } }, audio: false };
+  try { return await withTimeout(navigator.mediaDevices.getUserMedia(best), 7000); }
+  catch {
+    await new Promise(r => setTimeout(r, 500));
+    try { return await withTimeout(navigator.mediaDevices.getUserMedia(best), 7000); }
+    catch { return await withTimeout(navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }), 7000); }
+  }
+}
+async function startCam() {
+  if (!CAM.el || CAM.starting) return; CAM.starting = true;
+  const el = CAM.el, video = $("video", el); $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
+  try {
+    const stream = await getStream();
+    if (!CAM.el || CAM.el !== el) { stream.getTracks().forEach(t => t.stop()); return; }      // intussen gesloten
+    CAM.stream = stream; video.srcObject = stream; video.muted = true; await video.play().catch(() => {});
+    const tr = stream.getVideoTracks()[0];
+    if (tr) tr.addEventListener("ended", () => { if (CAM.el && !document.hidden) setTimeout(startCam, 300); });
+    const caps = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+    $(".torch", el).hidden = !caps.torch; CAM.torch = false; $(".torch", el).setAttribute("aria-pressed", "false");
+    $(".hint", el).textContent = "Leg de pagina precies in het kader";
+    setTimeout(() => { if (CAM.el === el && CAM.stream === stream && !video.videoWidth) { stopCam(); CAM.starting = false; startCam(); } }, 3000);   // zwart beeld: nog een keer
+  } catch {
+    if (CAM.el === el) { $(".camerr", el).hidden = false; $(".hint", el).textContent = ""; }
+  } finally { CAM.starting = false; }
+}
+function closeCam() { stopCam(); if (CAM.el) CAM.el.remove(); CAM.el = null; }
+document.addEventListener("visibilitychange", () => { if (!CAM.el) return; if (document.hidden) stopCam(); else startCam(); });
+window.addEventListener("pagehide", stopCam);
 async function openCam() {
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false }); }
-  catch { toast("Camera niet beschikbaar, de gewone camera opent"); $("#pickCamera").click(); return; }
+  if (CAM.el) { startCam(); return; }
   const el = document.createElement("div"); el.className = "cam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Camera");
-  el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Leg de pagina precies in het kader</div></div><div class="flash"></div>
+  el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Camera starten…</div></div><div class="flash"></div>
+    <div class="camerr" hidden><p>De camera start niet.</p><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
+    <button class="native" type="button" data-cam="native">iPhone camera</button>
+    <button class="torch" type="button" aria-label="Lamp" aria-pressed="false" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4zM10 8h4v13h-4z"/></svg></button>
     <div class="bar"><button class="x" type="button">Sluiten</button><button class="shut" type="button" aria-label="Foto maken"></button><button class="done" type="button">Klaar</button></div>`;
-  document.body.appendChild(el);
-  const video = $("video", el); video.srcObject = stream; await video.play().catch(() => {});
-  let n = 0;
-  const close = () => { stream.getTracks().forEach(t => t.stop()); el.remove(); };
-  $(".x", el).addEventListener("click", close); $(".done", el).addEventListener("click", close);
+  document.body.appendChild(el); CAM.el = el;
+  const video = $("video", el); let n = 0;
+  $(".x", el).addEventListener("click", closeCam); $(".done", el).addEventListener("click", closeCam);
+  $("[data-cam='retry']", el).addEventListener("click", () => startCam());
+  el.querySelectorAll("[data-cam='native']").forEach(b => b.addEventListener("click", () => { closeCam(); $("#pickCamera").click(); }));    // direct na een tik, dan mag het
+  $(".torch", el).addEventListener("click", async () => {
+    const tr = CAM.stream && CAM.stream.getVideoTracks()[0]; if (!tr) return;
+    CAM.torch = !CAM.torch; try { await tr.applyConstraints({ advanced: [{ torch: CAM.torch }] }); } catch { CAM.torch = false; }
+    $(".torch", el).setAttribute("aria-pressed", String(CAM.torch));
+  });
   $(".shut", el).addEventListener("click", async () => {
-    const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !CAM.stream) { startCam(); return; }
     const vr = video.getBoundingClientRect(), gr = $(".guide", el).getBoundingClientRect();
     const sc = Math.max(vr.width / vw, vr.height / vh), ox = (vr.width - vw * sc) / 2, oy = (vr.height - vh * sc) / 2, pad = 0.05;
     let w = gr.width / sc, h = gr.height / sc, x0 = (gr.left - vr.left - ox) / sc - w * pad, y0 = (gr.top - vr.top - oy) / sc - h * pad;
     w *= 1 + 2 * pad; h *= 1 + 2 * pad; x0 = Math.max(0, x0); y0 = Math.max(0, y0); w = Math.min(vw - x0, w); h = Math.min(vh - y0, h);
     const c = canvasOf(w, h); c.getContext("2d").drawImage(video, x0, y0, w, h, 0, 0, c.width, c.height);
     const fl = $(".flash", el); fl.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => fl.classList.remove("on")));
-    const blob = await toBlob(c, 0.92); n++; $(".done", el).textContent = `Klaar (${n})`;
+    const blob = await toBlob(c, 0.94); n++; $(".done", el).textContent = `Klaar (${n})`;
     addFiles([new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" })]);
   });
+  await startCam();
 }
 if (STANDALONE && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) $(".fab").addEventListener("click", e => { e.preventDefault(); openCam(); });
 
