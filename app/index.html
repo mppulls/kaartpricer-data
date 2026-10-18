@@ -966,7 +966,7 @@ function detailHtml(s, k, card, own) {
   h += `<div class="own"><span class="lbl" aria-hidden="true">&nbsp;</span><button class="nextbtn" data-act="next" ${ids} aria-label="Opslaan en volgende kaart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div></div>`;
   const vOpen = S.vers === k.k;
   h += `<div class="actions">
-    ${pid ? `<a class="btn primary" href="${cmLink(pid)}" target="cardmarket">Cardmarket NL NM<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
+    ${card ? `<a class="btn primary" href="${cmFor(card)}" target="cardmarket">${pid ? "Cardmarket NL NM" : "Zoek op Cardmarket"}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
     <button class="btn" data-act="rev" ${ids} aria-pressed="${k.rev}">Reverse</button>
     <button class="btn" data-act="vers" ${ids} aria-pressed="${vOpen}" aria-expanded="${vOpen}">Andere versies</button>
     <button class="btn danger" data-act="del" ${ids}>Verwijder</button></div>`;
@@ -1176,7 +1176,9 @@ function searchPass(q, fuzzy) {
   }
   return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
 }
-function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&sellerCountry=23&minCondition=2`; }
+// zonder Cardmarket nummer: zoeken op naam zoals Cardmarket hem schrijft (M Charizard EX heet daar MCharizard EX)
+const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1");
+function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=2&language=1`; }
 function openSearch(sId, key, opts = {}) {
   const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
   const start = k0 ? k0.lez.name : (S.lastQ || ""), showT = s0 ? trendOn(s0) : listTrend();
@@ -1244,7 +1246,7 @@ function drawLow(el) {
     return;
   }
   const { s, k } = cur; const card = CAT.byKey.get(k.sid + "|" + k.lid); const pid = pidOf(card); const t = trendOf(card, k.rev);
-  const link = pid ? cmLink(pid) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name + " " + numOf(card))}&sellerCountry=23&minCondition=2`;
+  const link = cmFor(card);
   const pctDone = Math.round(r.i / r.items.length * 100);
   body.innerHTML = `<div style="display:grid;gap:16px">
     <div class="lowhead"><b class="num">${r.i + 1} / ${r.items.length}</b><span class="prog"><i style="width:${pctDone}%"></i></span><button class="linkbtn" data-low="close">Stop</button></div>
@@ -1253,7 +1255,7 @@ function drawLow(el) {
       <div class="fine">${esc(card.set.name)}</div><div class="fine num">${[trendOn(s) ? `Trend ${t ? EUR.format(t) : "onbekend"}` : "", Number.isFinite(k.low) && k.low !== null ? `vorige prijs ${EUR.format(k.low)}` : ""].filter(Boolean).join(" · ")}</div>
       <button class="linkbtn" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button></div></div>
     ${LOW.vers ? versHtml(k, card, `data-low="pick"`, `data-low="search"`, trendOn(s)) : ""}
-    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">Open Cardmarket NL NM
+    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">${pid ? "Open Cardmarket NL NM" : "Zoek op Cardmarket"}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
     <label class="lbl" for="lowIn">Prijs (laagste NL NM)</label>
     <input class="bigin" id="lowIn" inputmode="decimal" enterkeyhint="next" placeholder="0,00" autocomplete="off" value="">
