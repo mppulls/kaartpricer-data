@@ -14,8 +14,14 @@ PRICES = os.path.join(HOME, "prices.json")
 PRODUCTS = os.path.join(HOME, "products.json")
 META = os.path.join(HOME, "meta.json")
 IMAGES = os.path.join(HOME, "images.json")
-LINK = "https://www.cardmarket.com/en/Pokemon/Products?idProduct={pid}&sellerCountry=23&minCondition=2"
-SEARCH = "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString={q}&sellerCountry=23&minCondition=2"
+LINK = "https://www.cardmarket.com/en/Pokemon/Products?idProduct={pid}&sellerCountry=23&minCondition={cond}"
+SEARCH = "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString={q}&sellerCountry=23&minCondition={cond}"
+
+
+def cond(card):
+    """Cardmarket conditie: sets uit 2016 en eerder vanaf Good (4), 2017 en nieuwer vanaf Near Mint (2)."""
+    rel = (card or {}).get("set_release") or ""
+    return 4 if rel and rel < "2017" else 2
 HEADER = ["Naam", "Set", "Nummer", "Trend", "Opmerking", "Cardmarket (NL, NM)"]
 
 
@@ -252,20 +258,20 @@ def match(readings_path, rows_path, with_trend=False):
             if lang != "en": name = f"{name} ({lang.upper()})"
             num = printed_number(card, r.get("number"))
             if prods:
-                pid = prods[0][0]; link = LINK.format(pid=pid) + ("&language=1" if lang == "en" else "")
+                pid = prods[0][0]; link = LINK.format(pid=pid, cond=cond(card)) + ("&language=1" if lang == "en" else "")
                 cm = pnames.get(str(pid))
                 if cm and lang == "en" and name_score(card["name"] or "", cm) < 0.6:
                     notes.append(f"Controleer link: Cardmarket product heet '{cm}'")
             else:
-                link = SEARCH.format(q=urllib.parse.quote(f"{name} {card['local_id']}")); notes.append("Geen directe Cardmarket koppeling, dit is een zoeklink")
+                link = SEARCH.format(q=urllib.parse.quote(f"{name} {card['local_id']}"), cond=cond(card)); notes.append("Geen directe Cardmarket koppeling, dit is een zoeklink")
             if st == "terugval": notes.append("Nummer niet goed leesbaar, gevonden op naam, HP en aanval")
             if st == "gekozen": notes.append("Nummer niet leesbaar, gekozen op artwork. Controleer")
             if st == "twijfel": notes.append("CONTROLEER, kan ook zijn: " + ", ".join(tag(c) for c in cands[1:6]))
             for vpid, label in [x for x in prods[1:] if "jumbo" not in x[1]][:2]:   # jumbo herken je zelf wel
-                notes.append(f"Variant {label}: " + LINK.format(pid=vpid))
+                notes.append(f"Variant {label}: " + LINK.format(pid=vpid, cond=cond(card)))
         else:
             name, setn, num = r.get("name_en") or r.get("name") or "?", "", r.get("number") or ""
-            link = SEARCH.format(q=urllib.parse.quote(name)); notes.append("NIET IN CATALOGUS, zoeklink")
+            link = SEARCH.format(q=urllib.parse.quote(name), cond=2); notes.append("NIET IN CATALOGUS, zoeklink")
             if lang != "en": name = f"{name} ({lang.upper()})"
         if rev: notes.insert(0, "Reverse holo")
         if r.get("note"): notes.append(r["note"])

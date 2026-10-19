@@ -332,7 +332,10 @@ const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const cmLink = pid => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=2&language=1`;
+// Cardmarket conditie: 2 = Near Mint of beter, 4 = Good of beter. Sets uit 2016 en eerder (vintage tot en met XY) vanaf Good,
+// want die kopen we zelden NM in. 2017 en nieuwer vanaf Near Mint.
+const cmCond = card => card && card.set && card.set.rel && card.set.rel < "2017" ? 4 : 2;
+const cmLink = (pid, card) => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`;
 const round2 = x => Math.round(x * 100) / 100;
 const isNum = v => typeof v === "number" && Number.isFinite(v);
 const parseMoney = v => { const n = parseFloat(String(v || "").replace(/[^\d,.]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return Number.isFinite(n) && n >= 0 ? round2(n) : null; };
@@ -1285,7 +1288,7 @@ function searchPass(q, fuzzy) {
 }
 // zonder Cardmarket nummer: zoeken op naam zoals Cardmarket hem schrijft (M Charizard EX heet daar MCharizard EX)
 const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1");
-function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=2&language=1`; }
+function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid, card) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`; }
 function openSearch(sId, key, opts = {}) {
   const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
   const start = k0 ? k0.lez.name : (S.lastQ || ""), showT = s0 ? trendOn(s0) : listTrend();
@@ -1499,7 +1502,7 @@ function dayRows() {
   const out = [["Inkoop", "Tijd", "Verkoper", "Betaald via", "Naam", "Set", "Nummer", "Trend", "Prijs", "Inkoopprijs", "Cardmarket (NL, NM)"]];
   for (const b of buys) for (const c of b.kaarten || [])
     out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", c.naam + (c.rev ? " (reverse)" : ""), c.set ? `${c.set} (${c.code})` : "", c.nr ? "'" + c.nr : "",
-      c.trend ?? "", isNum(c.eigen) ? c.eigen : (c.low ?? ""), c.inkoop ?? "", c.pid ? cmLink(c.pid) : ""]);
+      c.trend ?? "", isNum(c.eigen) ? c.eigen : (c.low ?? ""), c.inkoop ?? "", c.pid ? cmLink(c.pid, c.sid ? CAT.byKey.get(c.sid + "|" + c.lid) : null) : ""]);
   out.push([]);
   out.push(["Inkoop", "Tijd", "Verkoper", "Betaald via", "Kaarten", "Trend totaal", "Betaald"]);
   for (const b of buys) out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", b.n, b.trend || 0, b.betaald || 0]);
@@ -1559,7 +1562,7 @@ function rows() {
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
     const { card, trend, bod, pct: p } = priceOf(k, s);
     out.push([card ? card.name + (k.rev ? " (reverse)" : "") : (k.lez.name || "?"), card ? `${card.set.name} (${codeOf(card)})` : "", card ? "'" + numOf(card, k.lez.number) : "",
-      trend ?? "", priceVal(k) ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card)) : ""]);
+      trend ?? "", priceVal(k) ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card), card) : ""]);
   }
   return out;
 }
