@@ -25,6 +25,8 @@ def load(path):
 def nkey(s):
     """Naam zonder [aanvallen], (toevoegingen), Lv.nn, accenten en tekens: 'MCharizard EX [Crimson Dive]' en 'M Charizard EX' worden gelijk."""
     s = re.sub(r"^(Unown) \[(.)\]", r"\1 \2", s or "")                       # Cardmarket: 'Unown [J] Lv.12 [...]'
+    s = re.sub(r"\[(G|C|GL|FB|E4|4|M)\](?=\s*(LV|Lv|lv))", r" \1 ", s)      # Cardmarket: 'Charizard [G] LV.X', TCGdex: 'Charizard G LV.X'
+    s = re.sub(r"\bLV\.?\s*X\b", " ", s, flags=re.I)                         # LV.X staat bij TCGdex vaak niet in de naam
     s = re.sub(r"\[.*?\]|\(.*?\)", " ", s)
     s = re.sub(r"\bLv\.?\s*\d+\b", " ", s, flags=re.I)                         # DP tijdperk: 'Gliscor Lv.47'
     s = s.replace("♀", " f").replace("♂", " m").replace("δ", " delta")
@@ -35,6 +37,9 @@ def nkey(s):
 def pkey(s):
     s = re.sub(r"\s+-\s+[^\[]*", " ", s or "").replace("Delta Species", " ")
     k = nkey(s); return k[5:] if k.startswith("basic") and k.endswith("energy") else k
+
+
+LVX = re.compile(r"\bLV\.?\s*X\b", re.I)
 
 
 def atkey(names):
@@ -151,17 +156,26 @@ def fill_missing(cards, products):
         known = sorted(p for c in cs for p in card_pids(c) if exp.get(p) in exps)
         span = (known[-1] - known[0]) if known else 0
         lo, hi = (known[0] - max(60, span // 5), known[-1] + max(60, span // 5)) if known else (0, 10**12)
-        pool = collections.defaultdict(list)
-        for e in exps:
-            for pid in by_exp.get(e, []):
-                if pid not in used: pool[pkey(name[pid])].append(pid)
-        groups, have = collections.defaultdict(list), collections.defaultdict(list)
-        for c in missing: groups[nkey(c["name"])].append(c)
-        for c in cs:
-            ps = sorted(p for p in card_pids(c) if exp.get(p) in exps)
-            if ps: have[nkey(c["name"])].append((c, ps[0]))
-        for key, mc in groups.items():
-            if pool.get(key): match_group(mc, pool[key], lo, hi, strict, have.get(key, []))
+        # eerst met LV.X als apart kenmerk (Arceus LV.X naast twaalf gewone Arceus), daarna zonder (TCGdex laat LV.X vaak weg)
+        for aware in (True, False):
+            lv = (lambda t: "lvx" if LVX.search(t or "") else "") if aware else (lambda t: "")
+            pool = collections.defaultdict(list)
+            for e in exps:
+                for pid in by_exp.get(e, []):
+                    if pid not in used: pool[pkey(name[pid]) + lv(name[pid])].append(pid)
+            groups, have = collections.defaultdict(list), collections.defaultdict(list)
+            for c in cs:
+                if not card_pids(c): groups[nkey(c["name"]) + lv(c["name"])].append(c)
+                ps = sorted(p for p in card_pids(c) if exp.get(p) in exps)
+                if ps: have[nkey(c["name"]) + lv(c["name"])].append((c, ps[0]))
+            for key, mc in groups.items():
+                if pool.get(key): match_group(mc, pool[key], lo, hi, strict, have.get(key, []))
+    # Lv.X: TCGdex laat 'LV.X' vaak weg (DP18 heet daar 'Palkia'). Neem het over van het gekoppelde Cardmarket product.
+    for c in cards:
+        if c["region"] != "data" or LVX.search(c.get("name") or ""): continue
+        if any(LVX.search(name.get(p, "")) for p in card_pids(c)):
+            c["name"] = (c["name"] or "").strip() + " LV.X"; stats["lvx_naam"] += 1
+            if (c.get("rarity") or "Common") in ("Common", "None"): c["rarity"] = "Rare Holo LV.X"
     for c in suspects:
         oud = c.pop("_oud")
         if c.get("cm_match"):

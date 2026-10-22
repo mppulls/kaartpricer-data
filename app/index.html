@@ -352,6 +352,7 @@ const SUF = new Set(["ex", "gx", "v", "vmax", "vstar", "break", "lv", "x", "star
 
 function norm(s) {
   return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’']s\b/g, "")
+    .replace(/\blv\.?\s*x\b/g, " lv x ")                                     // 'LV.X', 'lvx', 'Lv. X' allemaal hetzelfde
     .replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
 }
 function lev(a, b) {
@@ -385,7 +386,8 @@ async function loadData() {
     fetch("catalog.json", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("catalogus"); return r.json(); }),
     fetch("prices.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { datum: null, p: {} }).catch(() => ({ datum: null, p: {} })),
   ]);
-  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || "", total: s[3] || 0, rel: s[4] || "", serie: s[5] || "", imgSet: s[6] || s[0] }));
+  // sets zonder code (zoals de DP promo's) krijgen hun id als code: DPP
+  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || (/^[a-z]{2,5}$/.test(s[0]) ? s[0].toUpperCase() : ""), total: s[3] || 0, rel: s[4] || "", serie: s[5] || "", imgSet: s[6] || s[0] }));
   c.cards.forEach(r => {
     const set = CAT.sets[r[0]], rar = c.rarities[r[5]] || "", tok = norm(r[2]);
     const card = {
@@ -1277,11 +1279,13 @@ function searchPass(q, fuzzy) {
       else { ok = false; break; }
     }
     if (!ok) continue;
-    if (nums.length && !nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid)) continue;
+    // '18' vindt ook DP18 en TG18 (promo nummers met letters ervoor), een exact nummer telt zwaarder
+    const exactNum = nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid);
+    if (nums.length && !exactNum && !nums.some(n => { const a = parseNumber(n).lid; return /^\d+[A-Z]?$/.test(a) && parseNumber(c.lid).lid.replace(/^[A-Z]+/, "") === a; })) continue;
     if (total && c.set.total !== total) continue;
     if (!words.length && !nums.length) continue;
     const nameWords = words.filter(w => nt.some(t => wordHit(t, w, fuzzy))).join(" ");
-    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + 5 * viaCode + (nums.length ? 2 : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
+    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + 5 * viaCode + (nums.length ? (exactNum ? 2 : 1) : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
     res.push([score, c]);
   }
   return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
