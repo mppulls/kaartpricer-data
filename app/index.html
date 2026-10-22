@@ -242,6 +242,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .sheet .item.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
 .sheet .item.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
 .srow .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .t b .lvl { display: inline; font-size: 12px; font-weight: 600; color: var(--muted); }
 .srow .sp { text-align: right; } .srow .sp b { display: block; font-size: 15px; } .srow .sp small { color: var(--muted); font-size: 11px; }
 .sbtn { background: var(--surface); width: 36px; height: 36px; color: var(--accent); }
 .sbtn.add { background: var(--accent); color: var(--accent-ink); }
@@ -344,7 +345,7 @@ const parseDate = s => new Date(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1
 const fmtTime = t => { const d = new Date(t); return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }); };
 
 /* ---------------------------------------------------------------- catalogus */
-const CAT = { ready: false, cards: [], byLocal: new Map(), byName: new Map(), byKey: new Map(), sets: [] };
+const CAT = { ready: false, cards: [], byLocal: new Map(), byName: new Map(), byLoose: new Map(), byKey: new Map(), sets: [] };
 const PR = { datum: null, p: {} };
 const PLAIN = new Set(["", "common", "uncommon", "rare", "holo rare", "double rare", "holo rare v", "holo rare vmax", "holo rare vstar", "none", "rare holo", "amazing rare", "radiant rare", "ace spec rare", "rare holo ex", "rare holo gx", "rare holo lv.x"]);
 const LABELS = new Set(["ultra", "rare", "attack", "full", "art", "alt", "sir", "ir", "hyper", "gold", "secret", "illustration", "special", "holo", "reverse", "promo"]);
@@ -353,8 +354,13 @@ const SUF = new Set(["ex", "gx", "v", "vmax", "vstar", "break", "lv", "x", "star
 function norm(s) {
   return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’']s\b/g, "")
     .replace(/\blv\.?\s*x\b/g, " lv x ")                                     // 'LV.X', 'lvx', 'Lv. X' allemaal hetzelfde
+    .replace(/δ/g, " delta ").replace(/[☆★]/g, " star ").replace(/◇/g, " prism star ")  // Delta Species, Gold Star, Prism Star
+    .replace(/\bdelta species\b/g, "delta").replace(/\bgold star\b/g, "star")
     .replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
 }
+/* losse naam: zonder toevoegingen die TCGdex, Cardmarket en de foto elk anders schrijven (LV.X, δ, ☆, ◇, SP letters G GL FB C E4) */
+const LOOSE_NOISE = new Set(["lv", "x", "delta", "species", "star", "gold", "prism", "g", "gl", "c", "fb", "e4", "4", "basic"]);
+const looseKey = s => norm(s).filter(t => !LOOSE_NOISE.has(t)).join(" ");
 function lev(a, b) {
   if (a === b) return 0; const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
   let prev = Array.from({ length: n + 1 }, (_, j) => j);
@@ -393,13 +399,14 @@ async function loadData() {
     const card = {
       sid: set.id, set, lid: r[1], name: r[2], hp: r[3] || 0, atk: new Set(String(r[4] || "").split("|").filter(Boolean).map(a => norm(a).join(" "))),
       rar, plain: PLAIN.has(rar.toLowerCase()), promo: /promo/i.test(rar) || /promo/i.test(set.name), pids: r[6] || [], imgf: r[7] || 0,
-      nn: tok.join(" "), suf: tok.filter(t => SUF.has(t)).join(" "),
+      nn: tok.join(" "), suf: tok.filter(t => SUF.has(t)).join(" "), lv: r[8] || 0,
     };
     card.key = card.sid + "|" + card.lid;
     CAT.cards.push(card); CAT.byKey.set(card.key, card);
     const lk = parseNumber(card.lid).lid;
     if (!CAT.byLocal.has(lk)) CAT.byLocal.set(lk, []); CAT.byLocal.get(lk).push(card);
     if (!CAT.byName.has(card.nn)) CAT.byName.set(card.nn, []); CAT.byName.get(card.nn).push(card);
+    const lo = looseKey(card.name); if (!CAT.byLoose.has(lo)) CAT.byLoose.set(lo, []); CAT.byLoose.get(lo).push(card);
   });
   PR.datum = p.datum; PR.p = p.p || {};
   CAT.ready = true;
@@ -442,20 +449,29 @@ function decide(name, number, code) {
 }
 function byName(name, hp, attacks) {
   const tok = norm(name), nn = tok.join(" "), suf = tok.filter(t => SUF.has(t)).join(" ");
+  const A = (attacks || []).map(a => norm(a).join(" ")).filter(Boolean), atkOK = c => A.some(a => c.atk.has(a));
+  const byHp = r => { if (hp) { const f = r.filter(c => !c.hp || c.hp === Number(hp)); if (f.length) return f; } return r; };
   let r = CAT.byName.get(nn) || [];
+  if (!r.length && /^mega .* ex$/.test(nn)) r = CAT.byName.get("m " + nn.slice(5)) || [];   // XY: 'Mega Charizard EX' heet 'M Charizard EX'
   if (!r.length) r = CAT.cards.filter(c => c.suf === suf && nameScore(name, c.name) >= 0.8);
-  if (hp) { const f = r.filter(c => !c.hp || c.hp === Number(hp)); if (f.length) r = f; }
-  if (attacks && attacks.length) {
-    const A = attacks.map(a => norm(a).join(" ")).filter(Boolean);
-    const f = r.filter(c => A.some(a => c.atk.has(a))); if (f.length) r = f;
+  r = byHp(r);
+  const loose = () => byHp(CAT.byLoose.get(looseKey(name)) || []);
+  if (A.length) {
+    const f = r.filter(atkOK); if (f.length) return f;
+    // naam net anders gelezen of geschreven (Palkia zonder LV.X, Deoxys zonder δ, Lance zonder Prism Star): losse naam plus aanvallen
+    const g = loose().filter(atkOK); if (g.length) return g;
+    return r.length ? r : loose();
   }
-  return r;
+  return r.length ? r : loose();
 }
 function stickerValue(s) {
   const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(s || "")); if (!m) return null;
   const v = parseFloat(m[1].replace(",", ".")); return v > 0 && v < 100000 ? v : null;
 }
 function identify(r) {
+  // level (DP en Platinum: 'LV.46' naast de naam) los van de naam houden, en gebruiken om te kiezen
+  const lvm = /\blv\.?\s*(\d{1,3})\b/i.exec(r.name || ""); const lvl = Number(r.level) || (lvm ? Number(lvm[1]) : 0);
+  if (lvm) r = { ...r, name: (r.name.slice(0, lvm.index) + " " + r.name.slice(lvm.index + lvm[0].length)).replace(/\s+/g, " ").trim() };
   const lang = String(r.lang || "en").toLowerCase();
   if (!CAT.ready) return { st: "none" };
   if (!["en", "eng", "english"].includes(lang)) return { st: "none", lang: lang.toUpperCase() };
@@ -467,6 +483,7 @@ function identify(r) {
   const { total } = parseNumber(r.number);
   if (code) { const f = c.filter(x => x.set.code.toUpperCase() === code); if (f.length) c = f; }
   if (total) { const f = c.filter(x => x.set.total === total); if (f.length) c = f; }
+  if (lvl) { const f = c.filter(x => x.lv === lvl); if (f.length) c = f; }
   const beforeArt = c;
   if (r.art && c.length > 1) {
     const f = r.art === "full" ? c.filter(x => !x.plain) : c.filter(x => x.plain || x.promo);
@@ -638,10 +655,10 @@ async function ensureList() { if (!listOf()) await newList(); return listOf(); }
 const STEP1 = `You are reading a phone photo of Pokémon trading cards: usually one binder page in a 3x3 grid, sometimes loose cards on a table.
 List every card that is fully or mostly visible, row by row, left to right. Skip empty pockets, and skip cards that are cut off at the photo edge or belong to the facing page.
 Write exactly one line of JSON per card and nothing else (no code fence, no commentary):
-{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","lang":"en","sticker":null}
+{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"level":null,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","lang":"en","sticker":null}
 box: the card outline as fractions (0 to 1) of the photo width and height.
 name: exactly as printed, with ex, V, VMAX, VSTAR, GX and owner prefixes such as N's, Misty's or Team Rocket's. Trainers and energy: the card title.
-hp: the number, or null. attacks: up to two ability or attack names as printed.
+hp: the number, or null. level: the LV. number printed next to the name on Diamond & Pearl and Platinum era cards (like 46), else null; keep it out of the name. attacks: up to two ability or attack names as printed.
 set and number: from the small print along the bottom edge. Newer cards (Sword & Shield, Scarlet & Violet, Mega Evolution) print a letter code and number bottom left, like "MEW" and "205/165" or "SVP" and "053". Older cards (Sun & Moon, XY, Black & White and earlier) print only a set symbol and the number, usually bottom right, like "101/108": then set is null. Only fill them in if you can really read them, else null. Never guess.
 art: "full" when the artwork covers the whole card (illustration rare, full art, special illustration rare, gold), else "regular".
 lang: the card language as a code, like "en", "ja", "ko", "de".
@@ -734,7 +751,7 @@ async function runJob(job) {
     let pending = "";
     const take = line => {
       const r = parseLine(line); if (!r || !(r.name || r.box)) return;
-      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null }, rev: false, eigen: null };
+      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, level: r.level || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null }, rev: false, eigen: null };
       applyId(k, identify(k.lez)); k.thumb = k.box ? thumbOf(bm, k.box, s.dim) : null;
       s.kaarten.push(k); S.fresh.add(k.k); s._v++; render();
     };
@@ -1249,6 +1266,14 @@ function splitQuery(q) {
   return { q: out, changed, clash };
 }
 function searchCards(q) {
+  // 'mega charizard ex' vindt ook de XY kaarten, die heten 'M Charizard EX'
+  const mm = /^\s*mega\s+(.+)$/i.exec(String(q || ""));
+  if (!mm) return searchOne(q);
+  const a = searchOne(q), b = searchOne("M " + mm[1]), seen = new Set(), out = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) for (const c of [a[i], b[i]]) if (c && !seen.has(c.key)) { seen.add(c.key); out.push(c); }
+  return out.slice(0, 50);
+}
+function searchOne(q) {
   const sp = splitQuery(q);
   const pass = fz => {
     if (!sp.changed) return searchPass(q, fz);
@@ -1264,7 +1289,8 @@ function wordHit(t, w, fuzzy) {
   return fuzzy && w.length >= 4 && sim(t.slice(0, Math.max(w.length, t.length)), w) >= 0.75;
 }
 function searchPass(q, fuzzy) {
-  const raw = String(q || "").toUpperCase(); let total = null;
+  let raw = String(q || "").toUpperCase(), total = null, level = 0;
+  const lq = /\bLV\.?\s*(\d{1,3})\b/.exec(raw); if (lq) { level = Number(lq[1]); raw = raw.replace(lq[0], " "); }   // 'garchomp lv 57
   const m = /([A-Z]*\d+[A-Z]?)\s*\/\s*([A-Z]*\d+)/.exec(raw); if (m && /^\d+$/.test(m[2])) total = parseInt(m[2], 10);
   const tok = norm(m ? raw.replace(m[0], " " + m[1] + " ") : raw); if (!tok.length) return [];
   const nums = tok.filter(t => /\d/.test(t) && !CAT.sets.some(st => (st.code || "").toLowerCase() === t)), words = tok.filter(t => !nums.includes(t));
@@ -1283,7 +1309,8 @@ function searchPass(q, fuzzy) {
     const exactNum = nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid);
     if (nums.length && !exactNum && !nums.some(n => { const a = parseNumber(n).lid; return /^\d+[A-Z]?$/.test(a) && parseNumber(c.lid).lid.replace(/^[A-Z]+/, "") === a; })) continue;
     if (total && c.set.total !== total) continue;
-    if (!words.length && !nums.length) continue;
+    if (level && c.lv !== level) continue;
+    if (!words.length && !nums.length && !level) continue;
     const nameWords = words.filter(w => nt.some(t => wordHit(t, w, fuzzy))).join(" ");
     const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + 5 * viaCode + (nums.length ? (exactNum ? 2 : 1) : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
     res.push([score, c]);
@@ -1291,7 +1318,7 @@ function searchPass(q, fuzzy) {
   return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
 }
 // zonder Cardmarket nummer: zoeken op naam zoals Cardmarket hem schrijft (M Charizard EX heet daar MCharizard EX)
-const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1");
+const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1").replace(/\s*[☆★]/, " Gold Star");   // Espeon ☆ heet daar Espeon Gold Star
 function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid, card) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`; }
 function openSearch(sId, key, opts = {}) {
   const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
@@ -1311,7 +1338,7 @@ function openSearch(sId, key, opts = {}) {
   const q = $("#q", sh.el), res = $("#res", sh.el); let timer = null;
   const row = c => {
     const t = trendOf(c, false), r = trendOf(c, true);
-    const info = `${IMG_ON ? (refImg(c, "sthumb") || `<span class="sthumb"></span>`) : ""}<span class="t"><b>${esc(c.name)}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
+    const info = `${IMG_ON ? (refImg(c, "sthumb") || `<span class="sthumb"></span>`) : ""}<span class="t"><b>${esc(c.name)}${c.lv ? ` <small class="lvl">Lv.${c.lv}</small>` : ""}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
       <span class="sp num">${showT ? `<b>${t ? EUR.format(t) : "€ ?"}</b>${r ? `<small>rev ${EUR.format(r)}</small>` : ""}` : ""}</span>`;
     if (k0) return `<button class="item srow pick" data-key="${esc(c.key)}">${info}</button>`;
     return `<div class="item srow">${info}
