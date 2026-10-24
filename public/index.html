@@ -1,0 +1,1968 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#11141b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kaartscan">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>MP Kaartscan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="/kp-shim.js"></script>
+</head>
+<body>
+<style>
+/* Layout: één kolom met de nieuwste scan bovenaan, een vaste kop met totalen en bod percentage,
+   en een vaste scanbalk onderin. De holo ring om de scanknop is het enige uitgesproken accent. */
+:root {
+  --bg: #f2f3f6;
+  --surface: #ffffff;
+  --surface-2: #e9ecf2;
+  --ink: #11141b;
+  --muted: #5b6475;
+  --line: #dfe3ea;
+  --accent: #2a43e6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eaff;
+  --ok: #0d7a53;
+  --ok-soft: #dff3ea;
+  --warn: #9a5200;
+  --warn-soft: #fff1dc;
+  --bad: #b8301a;
+  --bad-soft: #fde9e6;
+  --new: #e6eaff;
+  --shade: rgba(17, 20, 27, .45);
+  --shadow: 0 1px 2px rgba(17, 20, 27, .06), 0 6px 20px rgba(17, 20, 27, .07);
+  --f-ui: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-code: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
+    --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --ok-soft: #12271e; --warn: #f1a640; --warn-soft: #2b2112;
+    --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
+  --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --ok-soft: #12271e; --warn: #f1a640; --warn-soft: #2b2112;
+  --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.35;
+  -webkit-tap-highlight-color: transparent; padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+input, textarea, select { font-size: 16px; }   /* onder 16px zoomt iPhone in bij het tikken in een veld */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.num { font-variant-numeric: tabular-nums; }
+.code { font-family: var(--f-code); font-size: 12px; letter-spacing: .02em; }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* kop: lijstnaam, één bedrag en alleen de knoppen die er nu toe doen */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); }
+.top .wrap { padding-block: 8px 12px; display: grid; gap: 10px; }
+.row1 { display: flex; align-items: center; gap: 4px; }
+.listbtn { display: flex; align-items: center; gap: 4px; min-width: 0; font-weight: 600; font-size: 16px; color: var(--muted); }
+.listbtn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listbtn svg { flex: none; }
+.spacer { flex: 1; }
+.iconbtn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--ink); }
+.iconbtn:active { background: var(--surface-2); }
+.sum { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.sumleft { display: grid; gap: 2px; min-width: 0; }
+.offerrow { display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; }
+.mkt { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.sumleft b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.05; }
+.pctbtn { justify-self: start; display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pctbtn span { color: var(--accent); }
+.sumright { display: grid; gap: 2px; text-align: right; font-size: 13px; color: var(--muted); padding-bottom: 3px; }
+.sumright b { color: var(--ink); font-weight: 600; }
+.pctrow { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.pctrow::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pctin { flex: none; width: 76px; height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-weight: 600; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.fchip { flex: none; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--ink); border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 5px; }
+.fchip.warn { color: var(--warn); border-color: transparent; background: var(--warn-soft); }
+.fchip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* feed */
+main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
+.notice { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; font-size: 14px; color: var(--muted); }
+.notice b { color: var(--ink); }
+.empty { text-align: center; padding: 56px 12px 24px; display: grid; gap: 8px; justify-items: center; }
+.empty h2 { margin: 0; font-size: 20px; text-wrap: balance; }
+.empty p { margin: 0; color: var(--muted); max-width: 34ch; }
+.ghostgrid { display: grid; grid-template-columns: repeat(3, 34px); gap: 6px; margin-bottom: 8px; }
+.ghostgrid i { height: 46px; border-radius: 5px; border: 1.5px dashed var(--line); }
+.scan { background: var(--surface); border-radius: var(--r); overflow: hidden; box-shadow: 0 1px 2px rgba(17, 20, 27, .05); }
+.scanhead { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 14px; min-height: 40px; }
+.scanhead .cap { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scanhead .iconbtn { width: 34px; height: 34px; color: var(--muted); }
+.daycard .scanhead, .buyhead { padding: 12px 14px; }
+.buyhead .t { flex: 1; min-width: 0; } .buyhead .t b { display: block; font-size: 15px; } .buyhead .t small { color: var(--muted); font-size: 12px; }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.pill.busy { background: var(--accent-soft); color: var(--accent); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { color: var(--ok); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.linkbtn { color: var(--accent); font-weight: 600; font-size: 13px; padding: 4px 2px; }
+
+.card { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; position: relative; background: var(--surface); touch-action: pan-y; }
+.swipe { position: relative; background: var(--bad); border-top: 1px solid var(--line); overflow: hidden; }
+.scanhead + .swipe { border-top: 0; }
+.swipe-lbl { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; font-size: 14px; opacity: .55; transition: opacity .15s; }
+.swipe.armed .swipe-lbl { opacity: 1; }
+.errrow { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--line); }
+.card.check::before, .card.none::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--warn); }
+.card.none::before { background: var(--bad); }
+.card.fresh { animation: fresh 2.4s ease-out; }
+@keyframes fresh { 0% { background: var(--new); } 100% { background: var(--surface); } }
+.thumb { width: 40px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.info { min-width: 0; }
+.info b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info .sub { display: flex; gap: 6px; align-items: baseline; color: var(--muted); font-size: 12.5px; margin-top: 3px; white-space: nowrap; overflow: hidden; }
+.info .sub .warn { color: var(--warn); font-weight: 600; } .info .sub .bad { color: var(--bad); font-weight: 600; } .info .sub .rev, .pctt { color: var(--accent); font-weight: 600; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.rev { background: var(--accent-soft); color: var(--accent); }
+.price { text-align: right; white-space: nowrap; }
+.price b { display: block; font-size: 16px; font-weight: 700; }
+.price small { color: var(--muted); font-size: 12px; }
+.price small.own { color: var(--accent); font-weight: 600; }
+.price small.team { color: var(--ok); font-weight: 600; }
+.skel { height: 56px; margin: 10px 12px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-2), var(--bg), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.detail { grid-column: 1 / -1; display: grid; gap: 10px; padding-top: 4px; }
+.detail .lbl, .sheet .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.alts { display: flex; flex-wrap: wrap; gap: 6px; }
+.alt { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; text-align: left; }
+.alt .code { display: block; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { height: 38px; padding: 0 13px; border-radius: 11px; background: var(--surface-2); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.prices2 { display: grid; grid-template-columns: minmax(0, 1fr) 64px 44px; gap: 8px; align-items: start; }
+.nextbtn { width: 44px; height: 40px; border-radius: 11px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+.nextbtn:active { transform: scale(.95); }
+.vers { display: grid; gap: 8px; justify-items: start; }
+.qwrap { position: relative; }
+.qwrap .field { padding-right: 46px; }
+.qwrap input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.qclear { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); }
+.btn.vbtn { font-size: 15px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.linkbtn.vlink { font-size: 15px; font-weight: 700; padding: 6px 0; }
+.own.pctown input { padding: 0 6px; text-align: center; }
+.setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.setrow .t { min-width: 0; } .setrow .t b { display: block; font-size: 14px; } .setrow .t small { display: block; color: var(--muted); font-size: 12px; }
+.sheet .setrow { background: var(--bg); border: 0; }
+.switch { flex: none; width: 48px; height: 29px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); position: relative; transition: background .15s; }
+.switch i { position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.switch[aria-checked="true"] i { transform: translateX(19px); }
+.openbtn { justify-self: end; color: var(--warn); font-weight: 600; font-size: 13px; padding: 0; white-space: nowrap; }
+.lowpill { height: 30px; padding: 0 13px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; }
+.pctnote { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.own { display: grid; gap: 4px; }
+.own input { width: 100%; height: 40px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-weight: 600; font-size: 16px; }
+.own .fine { font-size: 11px; }
+.fine { font-size: 12px; color: var(--muted); }
+
+/* scanbalk */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to top, var(--bg) 70%, transparent); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-top: 18px; }
+.dock .wrap { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.side { justify-self: start; width: 52px; height: 52px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--ink); }
+.queue { justify-self: end; font-size: 12px; color: var(--muted); text-align: right; }
+.fab { position: relative; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; isolation: isolate; }
+.fab::before { content: ""; position: absolute; inset: 0; border-radius: 50%; z-index: -2;
+  background: conic-gradient(from var(--spin, 0deg), #ff8a8a, #ffd36e, #8cf0b4, #77c6ff, #b59cff, #ff8ad8, #ff8a8a);
+  animation: spin 6s linear infinite; }
+.fab::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--ink); z-index: -1; }
+.fab svg { color: var(--bg); }
+.fab:active { transform: scale(.96); }
+@property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin { to { --spin: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .fab::before, .dot, .skel { animation: none; } .card.fresh { animation: none; } }
+
+/* vellen */
+.sheet { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; background: var(--shade); }
+.sheet > div { background: var(--surface); border-radius: 20px 20px 0 0; max-height: 86vh; overflow: auto; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; max-width: 640px; width: 100%; margin: 0 auto; }
+.sheet.top { align-items: start; }
+.sheet.top > div { border-radius: 0 0 20px 20px; padding-top: calc(16px + env(safe-area-inset-top, 0px)); max-height: 78vh; }
+.sheet h3 { margin: 0; font-size: 17px; }
+.sheet .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); text-align: left; width: 100%; }
+.sheet .item .t { flex: 1; min-width: 0; }
+.sheet .item small { color: var(--muted); display: block; font-size: 12px; }
+.sheet .item.on { outline: 2px solid var(--accent); }
+/* menu: tegels per soort actie, elk met een eigen kleur en icoon */
+.mgroup { display: grid; gap: 6px; }
+.mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mtile { display: grid; align-content: start; gap: 6px; padding: 12px; border-radius: 14px; background: var(--bg); text-align: left; min-height: 96px; min-width: 0; }
+.mtile b { font-size: 14px; line-height: 1.25; }
+.mtile small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+.mtile:disabled { opacity: .5; }
+.mtile.wide { grid-column: 1 / -1; min-height: 0; grid-template-columns: auto 1fr; align-items: center; column-gap: 10px; }
+.mtile.wide .mt { display: grid; gap: 2px; min-width: 0; }
+.mi { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+.mi svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mi.blue { background: var(--accent-soft); color: var(--accent); }
+.mi.green { background: var(--ok-soft); color: var(--ok); }
+.mi.amber { background: var(--warn-soft); color: var(--warn); }
+.mi.grey { background: var(--surface-2); color: var(--muted); }
+.mi.red { background: var(--bad-soft); color: var(--bad); }
+.mtile.danger { box-shadow: inset 0 0 0 1.5px var(--bad-soft); } .mtile.danger b { color: var(--bad); }
+.btn.danger.solid { background: var(--bad); color: #fff; }
+.fine.team { color: var(--ok); font-weight: 600; }
+/* reverse aan: duidelijke rand rondom, nog een keer tikken zet hem uit */
+.btn.revbtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.lowtools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .lowtools .revbtn { height: 32px; font-size: 13px; padding: 0 11px; }
+.confirm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .confirm .btn { height: 46px; justify-content: center; }
+.warnhead { display: flex; align-items: center; gap: 10px; }
+.field { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
+.sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+.lowbtn { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 5px; }
+.buybtn { justify-self: end; height: 52px; padding: 0 16px; border-radius: 26px; background: var(--surface); border: 1.5px solid var(--bad); box-shadow: var(--shadow); display: inline-grid; align-content: center; justify-items: center; gap: 1px; text-align: center; line-height: 1.15; }
+.buybtn b { font-size: 14px; } .buybtn small { font-size: 12px; color: var(--muted); }
+.buybtn:disabled { opacity: .45; }
+.qpill { position: absolute; left: 50%; transform: translateX(-50%); top: -10px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.qpill:empty { display: none; }
+.toast { display: flex; gap: 14px; align-items: center; width: max-content; }
+.toast span { min-width: 0; }
+.toastbtn { color: var(--accent-soft); font-weight: 700; white-space: nowrap; }
+.sumgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sumgrid div { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.sumgrid small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.sumgrid b { font-size: 17px; }
+.daycard { padding: 14px 12px; display: grid; gap: 12px; }
+.daycard .big { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.buyhead { cursor: pointer; }
+.buyrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.buyrow img, .buyrow .ph { width: 34px; height: 48px; border-radius: 4px; object-fit: cover; background: var(--surface-2); }
+.buyrow b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buyrow small { color: var(--muted); font-size: 12px; }
+.sheet.low > div { max-height: 92vh; }      /* bovenin: het toetsenbord komt eronder en duwt niets weg */
+.lowhead { display: flex; align-items: center; gap: 10px; }
+.lowhead .prog { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.lowhead .prog i { display: block; height: 100%; background: var(--accent); }
+.lowcard { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; align-items: center; }
+.lowcard img, .lowcard .ph { width: 72px; height: 100px; border-radius: 7px; object-fit: cover; background: var(--surface-2); display: block; }
+.lowcard b { font-size: 18px; display: block; }
+.lowcard .fine { margin-top: 4px; }
+.bigin { width: 100%; height: 58px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); padding: 0 16px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bigin:focus { border-color: var(--accent); outline: none; }
+.btn.wide { width: 100%; height: 50px; justify-content: center; font-size: 16px; border-radius: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheet .item.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; padding: 10px 10px 10px 12px; }
+.sheet .item.srow.pick { grid-template-columns: minmax(0, 1fr) auto; }
+.srow .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .t b .lvl { display: inline; font-size: 12px; font-weight: 600; color: var(--muted); }
+.srow .sp { text-align: right; } .srow .sp b { display: block; font-size: 15px; } .srow .sp small { color: var(--muted); font-size: 11px; }
+.sbtn { background: var(--surface); width: 36px; height: 36px; color: var(--accent); }
+.sbtn.add { background: var(--accent); color: var(--accent-ink); }
+.cmp { display: flex; gap: 12px; }
+.cmp figure { margin: 0; display: grid; gap: 4px; justify-items: start; }
+.cmp img, .cmp .big { width: 120px; height: 168px; border-radius: 8px; object-fit: cover; background: var(--surface-2); display: block; }
+.cmp figcaption { font-size: 11px; color: var(--muted); }
+.alt.withimg { display: grid; grid-template-columns: 44px auto; gap: 8px; align-items: center; padding: 6px 10px 6px 6px; }
+.altimg { width: 44px; height: 62px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.sheet .item.srow:has(.sthumb) { grid-template-columns: 40px minmax(0, 1fr) auto auto auto; }
+.sheet .item.srow.pick:has(.sthumb) { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.sthumb { width: 40px; height: 56px; border-radius: 4px; object-fit: cover; background: var(--surface-2); display: block; }
+.cam { position: fixed; inset: 0; z-index: 40; background: #000; color: #fff; display: grid; grid-template-rows: 1fr auto; }
+.cam video { width: 100%; height: 100%; object-fit: cover; grid-row: 1 / -1; grid-column: 1; }
+.cam .guide { grid-row: 1; grid-column: 1; align-self: center; justify-self: center; position: relative; width: min(88vw, calc((100vh - 200px) * .78)); aspect-ratio: 3 / 3.85; border: 2px solid rgba(255,255,255,.9); border-radius: 10px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.45);
+  background-image: linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(90deg, rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(90deg, rgba(255,255,255,.35), rgba(255,255,255,.35));
+  background-size: 100% 1px, 100% 1px, 1px 100%, 1px 100%; background-position: 0 33.33%, 0 66.66%, 33.33% 0, 66.66% 0; background-repeat: no-repeat; }
+.cam .hint { position: absolute; left: 0; right: 0; top: -34px; text-align: center; font-size: 14px; font-weight: 600; }
+.cam .bar { grid-row: 2; grid-column: 1; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 18px max(20px, env(safe-area-inset-left, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)); background: rgba(0,0,0,.55); }
+.cam .shut { width: 76px; height: 76px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); }
+.cam .shut:active { background: #fff; }
+.cam .x { justify-self: start; color: #fff; font-weight: 600; font-size: 16px; }
+.cam .done { justify-self: end; color: #fff; font-weight: 700; font-size: 16px; }
+.cam .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.cam .flash.on { opacity: .7; transition: none; }
+.cam .camerr { grid-row: 1; grid-column: 1; align-self: center; justify-self: center; z-index: 2; display: grid; gap: 10px; justify-items: center; background: rgba(0,0,0,.78); padding: 20px; border-radius: 16px; text-align: center; }
+.cam .camerr[hidden] { display: none; }
+.cam .camerr p { margin: 0 0 4px; font-weight: 600; }
+.cam .camerr .fine { color: rgba(255,255,255,.78); max-width: 290px; margin-bottom: 4px; }
+.cam .torch { grid-row: 1; grid-column: 1; align-self: start; justify-self: end; z-index: 2; margin: calc(14px + env(safe-area-inset-top, 0px)) 14px 0 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; display: grid; place-items: center; }
+.cam .torch[aria-pressed="true"] { background: #ffd54a; color: #000; }
+.cam .native { grid-row: 1; grid-column: 1; align-self: start; justify-self: start; z-index: 2; margin: calc(18px + env(safe-area-inset-top, 0px)) 0 0 16px; padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font-size: 13px; font-weight: 600; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row1">
+      <button class="listbtn" id="listBtn" type="button" aria-label="Kies lijst"><span id="listName">Kaartscan</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="searchBtn" type="button" aria-label="Zoek een kaart"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <button class="iconbtn" id="menuBtn" type="button" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+    </div>
+    <div class="sum">
+      <div class="sumleft">
+        <button class="pctbtn" id="pctBtn" type="button" aria-expanded="false">Bod <span id="pctLbl">70%</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="offerrow"><b class="num" id="sOffer">€ 0,00</b><span class="mkt num" id="sMarket">€ 0,00 markt</span></div>
+      </div>
+      <div class="sumright num"><span><b id="sCount">0</b> kaarten</span><span id="sTrendRow" hidden>trend <b id="sTrend">€ 0,00</b></span><button class="openbtn" id="sOpen" type="button" hidden></button><span id="tDate" hidden></span></div>
+    </div>
+    <div class="pctrow" id="pctRow" hidden></div>
+    <div class="setrow" id="trendRow" hidden><span class="t"><b>Trend</b><small id="trendHint"></small></span><button class="switch" id="trendSw" type="button" role="switch" aria-checked="false" aria-label="Trend tonen en gebruiken"><i></i></button></div>
+    <div class="pctnote fine" id="pctNote" hidden></div>
+    <div class="chips" id="chips" hidden>
+      <button class="fchip" id="tabAll" type="button" data-filter="all" aria-pressed="true" hidden>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Lijst</button>
+      <button class="fchip warn" id="tabCheck" type="button" data-filter="check" aria-pressed="false" hidden><span class="num" id="checkCnt"></span> controleren</button>
+      <button class="fchip" id="lowBtn" type="button" hidden>Prijzen checken</button>
+      <button class="fchip" id="tabBuy" type="button" data-filter="buy" aria-pressed="false" hidden>Inkopen <span class="num" id="buyCnt"></span></button>
+    </div>
+  </div>
+</header></header>
+
+<main><div class="wrap" id="feed"></div></main>
+
+<div class="dock">
+  <div class="wrap">
+    <div class="qpill num" id="queue" aria-live="polite"></div>
+    <label class="side" for="pickGallery" aria-label="Foto's kiezen uit je galerij">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg></label>
+    <label class="fab" for="pickCamera" aria-label="Scan met camera">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg></label>
+    <button class="buybtn" id="buyBtn" type="button" hidden><b>Koop in</b><small class="num" id="buySub">opslaan</small></button>
+  </div>
+  <input class="sr" type="file" id="pickCamera" accept="image/*" capture="environment">
+  <input class="sr" type="file" id="pickGallery" accept="image/*" multiple>
+</div>
+
+<div id="sheetHost"></div>
+<div id="toastHost" aria-live="polite"></div>
+
+<script>
+"use strict";
+const SHEET_ID = "1A4MfpmtCSeFfYpSJ72w6lDzyk9Q35PNqxV0NBQ6-rfE";
+const MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+// Cardmarket conditie: 2 = Near Mint of beter, 4 = Good of beter. Sets uit 2016 en eerder (vintage tot en met XY) vanaf Good,
+// want die kopen we zelden NM in. 2017 en nieuwer vanaf Near Mint.
+const cmCond = card => card && card.set && card.set.rel && card.set.rel < "2017" ? 4 : 2;
+/* reverse holo is bij Cardmarket een kenmerk van het aanbod, geen apart product: filter Y voor reverse, N voor de gewone versie
+   van een kaart die ook als reverse bestaat (anders zit de reverse er tussen) */
+const canRev = card => !!(card && trendOf(card, true));
+const revParam = (card, rev) => rev === true ? "&isReverseHolo=Y" : rev === false && canRev(card) ? "&isReverseHolo=N" : "";
+const cmLink = (pid, card, rev) => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=${cmCond(card)}&language=1${revParam(card, rev)}`;
+const cmLabel = (card, rev) => `NL ${cmCond(card) === 4 ? "Good" : "NM"}${rev ? " reverse" : ""}`;
+const round2 = x => Math.round(x * 100) / 100;
+const isNum = v => typeof v === "number" && Number.isFinite(v);
+const parseMoney = v => { const n = parseFloat(String(v || "").replace(/[^\d,.]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return Number.isFinite(n) && n >= 0 ? round2(n) : null; };
+const fmtDate = d => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+const parseDate = s => new Date(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+const fmtTime = t => { const d = new Date(t); return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }); };
+
+/* ---------------------------------------------------------------- catalogus */
+const CAT = { ready: false, cards: [], byLocal: new Map(), byName: new Map(), byLoose: new Map(), byKey: new Map(), sets: [] };
+const PR = { datum: null, p: {} };
+const PLAIN = new Set(["", "common", "uncommon", "rare", "holo rare", "double rare", "holo rare v", "holo rare vmax", "holo rare vstar", "none", "rare holo", "amazing rare", "radiant rare", "ace spec rare", "rare holo ex", "rare holo gx", "rare holo lv.x"]);
+const LABELS = new Set(["ultra", "rare", "attack", "full", "art", "alt", "sir", "ir", "hyper", "gold", "secret", "illustration", "special", "holo", "reverse", "promo"]);
+const SUF = new Set(["ex", "gx", "v", "vmax", "vstar", "break", "lv", "x", "star"]);
+
+function norm(s) {
+  return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’']s\b/g, "")
+    .replace(/\blv\.?\s*x\b/g, " lv x ")                                     // 'LV.X', 'lvx', 'Lv. X' allemaal hetzelfde
+    .replace(/δ/g, " delta ").replace(/[☆★]/g, " star ").replace(/◇/g, " prism star ")  // Delta Species, Gold Star, Prism Star
+    .replace(/\bdelta species\b/g, "delta").replace(/\bgold star\b/g, "star")
+    .replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
+}
+/* losse naam: zonder toevoegingen die TCGdex, Cardmarket en de foto elk anders schrijven (LV.X, δ, ☆, ◇, SP letters G GL FB C E4) */
+const LOOSE_NOISE = new Set(["lv", "x", "delta", "species", "star", "gold", "prism", "g", "gl", "c", "fb", "e4", "4", "basic"]);
+const looseKey = s => norm(s).filter(t => !LOOSE_NOISE.has(t)).join(" ");
+function lev(a, b) {
+  if (a === b) return 0; const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+const sim = (a, b) => (a || b) ? 1 - lev(a, b) / Math.max(a.length, b.length) : 1;
+function nameScore(q, c) {
+  const Q = norm(q), C = norm(c);
+  let qs = Q.filter(t => !SUF.has(t) && !LABELS.has(t)); if (!qs.length) qs = Q.filter(t => !SUF.has(t));
+  const cs = C.filter(t => !SUF.has(t));
+  if (!qs.length || !cs.length) return 0;
+  const rc = cs.filter(t => Math.max(...qs.map(u => sim(t, u))) >= 0.72).length / cs.length;
+  const rq = qs.filter(u => Math.max(...cs.map(t => sim(u, t))) >= 0.72).length / qs.length;
+  return Math.max(sim(qs.join(""), cs.join("")), 0.6 * Math.max(rc, rq) + 0.4 * Math.min(rc, rq));
+}
+function parseNumber(num) {
+  num = String(num || "").trim().toUpperCase().replace(/\s+/g, "");
+  const [left = "", right = ""] = num.split("/");
+  const m = /^([A-Z]*)0*(\d+)([A-Z]?)$/.exec(left);
+  return { lid: m ? m[1] + m[2] + m[3] : left, total: /^\d+$/.test(right) ? parseInt(right, 10) : null };
+}
+async function loadData() {
+  const [c, p] = await Promise.all([
+    fetch("catalog.json", { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error("catalogus"); return r.json(); }),
+    fetch("prices.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { datum: null, p: {} }).catch(() => ({ datum: null, p: {} })),
+  ]);
+  // sets zonder code (zoals de DP promo's) krijgen hun id als code: DPP
+  CAT.sets = c.sets.map(s => ({ id: s[0], name: s[1], code: s[2] || (/^[a-z]{2,5}$/.test(s[0]) ? s[0].toUpperCase() : ""), total: s[3] || 0, rel: s[4] || "", serie: s[5] || "", imgSet: s[6] || s[0] }));
+  c.cards.forEach(r => {
+    const set = CAT.sets[r[0]], rar = c.rarities[r[5]] || "", tok = norm(r[2]);
+    const card = {
+      sid: set.id, set, lid: r[1], name: r[2], hp: r[3] || 0, atk: new Set(String(r[4] || "").split("|").filter(Boolean).map(a => norm(a).join(" "))),
+      rar, plain: PLAIN.has(rar.toLowerCase()), promo: /promo/i.test(rar) || /promo/i.test(set.name), pids: r[6] || [], imgf: r[7] || 0,
+      nn: tok.join(" "), suf: tok.filter(t => SUF.has(t)).join(" "), lv: r[8] || 0,
+    };
+    card.key = card.sid + "|" + card.lid;
+    CAT.cards.push(card); CAT.byKey.set(card.key, card);
+    const lk = parseNumber(card.lid).lid;
+    if (!CAT.byLocal.has(lk)) CAT.byLocal.set(lk, []); CAT.byLocal.get(lk).push(card);
+    if (!CAT.byName.has(card.nn)) CAT.byName.set(card.nn, []); CAT.byName.get(card.nn).push(card);
+    const lo = looseKey(card.name); if (!CAT.byLoose.has(lo)) CAT.byLoose.set(lo, []); CAT.byLoose.get(lo).push(card);
+  });
+  PR.datum = p.datum; PR.p = p.p || {};
+  CAT.ready = true;
+}
+const IMG_ON = !!(window.KP && window.KP.img);
+const STANDALONE = !!(window.KP && window.KP.standalone);
+function imgOf(card) {
+  if (!IMG_ON || !card || !card.imgf || !card.set.serie) return null;
+  return `/img/${card.set.serie}/${card.imgf === 2 ? card.set.imgSet : card.set.id}/${encodeURIComponent(card.lid)}.webp`;
+}
+const refImg = (card, cls = "thumb") => { const u = imgOf(card); return u ? `<img class="${cls}" src="${u}" alt="" loading="lazy" data-ref="1">` : ""; };
+document.addEventListener("error", e => { const t = e.target; if (t && t.tagName === "IMG" && t.dataset && t.dataset.ref) { const ph = document.createElement("span"); ph.className = t.className; t.replaceWith(ph); } }, true);
+function pidOf(card) { if (!card) return null; return card.pids.find(p => PR.p[p]) || card.pids[0] || null; }
+function trendOf(card, rev) {
+  const pid = pidOf(card); const v = pid && PR.p[pid]; if (!v) return null;
+  const x = rev ? v[1] : v[0]; return (typeof x === "number" && x > 0) ? x : null;
+}
+const codeOf = card => card.set.code || card.set.id;
+function numOf(card, read) {
+  const left = String(read || "").toUpperCase().replace(/\s+/g, "").split("/")[0];
+  if (left && parseNumber(left).lid === parseNumber(card.lid).lid) return left;
+  return /^\d+$/.test(card.lid) && card.set.rel >= "2020" ? card.lid.padStart(3, "0") : card.lid;
+}
+
+/* ---------------------------------------------------------------- herkennen */
+function decide(name, number, code) {
+  const { lid, total } = parseNumber(number); const out = [];
+  for (const c of CAT.byLocal.get(lid) || []) {
+    const ns = name ? nameScore(name, c.name) : 0.5; let score = ns, anchored = false;
+    if (total != null) { if (c.set.total === total) { score += 0.5; anchored = true; } else score -= 0.35; }
+    if (code && c.set.code && code.toUpperCase() === c.set.code.toUpperCase()) { score += 0.6; anchored = true; }
+    if (ns >= 0.4 || (code && anchored)) out.push({ score, ns, anchored, c });
+  }
+  out.sort((a, b) => b.score - a.score);
+  if (!out.length) return null;
+  const best = out[0], alts = out.slice(1, 8).map(x => x.c);
+  if (out[1] && best.score - out[1].score < 0.15) return { st: "check", card: best.c, alts };
+  if ((best.anchored && best.ns >= 0.55) || (!best.anchored && best.ns >= 0.85)) return { st: "ok", card: best.c, alts: [] };
+  return { st: "check", card: best.c, alts };
+}
+function byName(name, hp, attacks) {
+  const tok = norm(name), nn = tok.join(" "), suf = tok.filter(t => SUF.has(t)).join(" ");
+  const A = (attacks || []).map(a => norm(a).join(" ")).filter(Boolean), atkOK = c => A.some(a => c.atk.has(a));
+  const byHp = r => { if (hp) { const f = r.filter(c => !c.hp || c.hp === Number(hp)); if (f.length) return f; } return r; };
+  let r = CAT.byName.get(nn) || [];
+  if (!r.length && /^mega .* ex$/.test(nn)) r = CAT.byName.get("m " + nn.slice(5)) || [];   // XY: 'Mega Charizard EX' heet 'M Charizard EX'
+  if (!r.length) r = CAT.cards.filter(c => c.suf === suf && nameScore(name, c.name) >= 0.8);
+  r = byHp(r);
+  const loose = () => byHp(CAT.byLoose.get(looseKey(name)) || []);
+  if (A.length) {
+    const f = r.filter(atkOK); if (f.length) return f;
+    // naam net anders gelezen of geschreven (Palkia zonder LV.X, Deoxys zonder δ, Lance zonder Prism Star): losse naam plus aanvallen
+    const g = loose().filter(atkOK); if (g.length) return g;
+    return r.length ? r : loose();
+  }
+  return r.length ? r : loose();
+}
+function stickerValue(s) {
+  const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(s || "")); if (!m) return null;
+  const v = parseFloat(m[1].replace(",", ".")); return v > 0 && v < 100000 ? v : null;
+}
+function identify(r) {
+  // level (DP en Platinum: 'LV.46' naast de naam) los van de naam houden, en gebruiken om te kiezen
+  const lvm = /\blv\.?\s*(\d{1,3})\b/i.exec(r.name || ""); const lvl = Number(r.level) || (lvm ? Number(lvm[1]) : 0);
+  if (lvm) r = { ...r, name: (r.name.slice(0, lvm.index) + " " + r.name.slice(lvm.index + lvm[0].length)).replace(/\s+/g, " ").trim() };
+  const lang = String(r.lang || "en").toLowerCase();
+  if (!CAT.ready) return { st: "none" };
+  if (!["en", "eng", "english"].includes(lang)) return { st: "none", lang: lang.toUpperCase() };
+  const code = String(r.set || "").toUpperCase().replace(/\s*EN$/, "").trim();
+  let d = null;
+  if (r.number) { d = decide(r.name, r.number, code); if (d && d.st === "ok") return d; }
+  let c = r.name ? byName(r.name, r.hp, r.attacks) : [];
+  if (!c.length) return d || { st: "none" };
+  const { total } = parseNumber(r.number);
+  if (code) { const f = c.filter(x => x.set.code.toUpperCase() === code); if (f.length) c = f; }
+  if (total) { const f = c.filter(x => x.set.total === total); if (f.length) c = f; }
+  if (lvl) { const f = c.filter(x => x.lv === lvl); if (f.length) c = f; }
+  const beforeArt = c;
+  if (r.art && c.length > 1) {
+    const f = r.art === "full" ? c.filter(x => !x.plain) : c.filter(x => x.plain || x.promo);
+    if (f.length) c = f;
+  }
+  if (c.length === 1) return beforeArt.length === 1 ? { st: "ok", card: c[0], alts: [] }     // alleen door 'full art' uniek: nummer laten bevestigen
+    : { st: "check", card: c[0], alts: beforeArt.filter(x => x !== c[0]).slice(0, 8) };
+  c = [...c].sort((a, b) => (b.set.rel || "").localeCompare(a.set.rel || ""));
+  let pick = c[0]; const sv = stickerValue(r.sticker);
+  if (sv) {
+    let best = Infinity;
+    for (const x of c) { const t = trendOf(x, false); if (t) { const dd = Math.abs(Math.log(t / sv)); if (dd < best) { best = dd; pick = x; } } }
+  }
+  return { st: "check", card: pick, alts: c.filter(x => x !== pick).slice(0, 8) };
+}
+function applyId(k, res) {
+  k.st = res.st; k.sid = res.card ? res.card.sid : null; k.lid = res.card ? res.card.lid : null;
+  k.alts = (res.alts || []).map(a => [a.sid, a.lid]); if (res.lang) k.lang = res.lang;
+}
+/* reverse uit de foto: alleen bij een gewone kaart die ook als reverse bestaat. Herkend wordt gemarkeerd, uittikken kan altijd */
+function autoRev(k, seen) {
+  if (k.revManual) return;
+  const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
+  const on = seen === true && k.lez.art !== "full" && canRev(card);
+  k.rev = on; k.revAuto = on;
+}
+function toggleRev(sId, key) {
+  const s = scanById(sId), k0 = s && s.kaarten.find(x => x.k === key); if (!k0) return;
+  const had = priceVal(k0) != null, to = !k0.rev;
+  editCard(sId, key, k => { k.rev = to; k.revAuto = false; k.revManual = true; if (had) { k.low = null; k.eigen = null; k.lowT = null; } });
+  if (had) toast(`${to ? "Reverse" : "Gewone versie"}: je prijs is gewist omdat die bij de ${to ? "gewone versie" : "reverse"} hoorde`, 4000);
+}
+
+/* ---------------------------------------------------------------- beelden */
+async function toBitmap(file) {
+  try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch {
+    const url = URL.createObjectURL(file);
+    try { const img = new Image(); img.src = url; await img.decode(); return await createImageBitmap(img); }
+    finally { URL.revokeObjectURL(url); }
+  }
+}
+function canvasOf(w, h) { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function toBlob(c, q) { return new Promise(res => c.toBlob(res, "image/jpeg", q)); }
+async function scaled(bm, maxPixels, q) {
+  const s = Math.min(1, Math.sqrt(maxPixels / (bm.width * bm.height)));
+  const c = canvasOf(bm.width * s, bm.height * s); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height); return toBlob(c, q);
+}
+function boxPx(bm, box, pad, dim) {
+  if (!Array.isArray(box) || box.length < 4) return null;
+  let [x0, y0, x1, y1] = box.map(Number);
+  if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
+  if (Math.max(x0, y0, x1, y1) > 1.5) {            // pixels van de verstuurde foto of promille
+    const [W, H] = dim || [1000, 1000];
+    x0 /= W; x1 /= W; y0 /= H; y1 /= H;
+  }
+  const w = x1 - x0, h = y1 - y0; if (w <= 0 || h <= 0) return null;
+  x0 = Math.max(0, x0 - w * pad); x1 = Math.min(1, x1 + w * pad); y0 = Math.max(0, y0 - h * pad); y1 = Math.min(1, y1 + h * pad);
+  return [x0 * bm.width, y0 * bm.height, (x1 - x0) * bm.width, (y1 - y0) * bm.height];
+}
+function cropCanvas(bm, box, pad, maxSide, dim) {
+  const p = boxPx(bm, box, pad, dim); if (!p) return null;
+  const s = Math.min(1, maxSide / Math.max(p[2], p[3]));
+  const c = canvasOf(p[2] * s, p[3] * s); c.getContext("2d").drawImage(bm, p[0], p[1], p[2], p[3], 0, 0, c.width, c.height); return c;
+}
+function thumbOf(bm, box, dim) {
+  const p = boxPx(bm, box, 0.02, dim); if (!p) return null;
+  const c = canvasOf(64, 90), g = c.getContext("2d"); const s = Math.max(64 / p[2], 90 / p[3]);
+  const w = 64 / s, h = 90 / s; g.drawImage(bm, p[0] + (p[2] - w) / 2, p[1] + (p[3] - h) / 2, w, h, 0, 0, 64, 90);
+  return c.toDataURL("image/jpeg", 0.62);
+}
+function photoThumb(bm) { const s = 96 / Math.max(bm.width, bm.height); const c = canvasOf(bm.width * s, bm.height * s); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.6); }
+
+/* ---------------------------------------------------------------- opslag */
+const S = { db: null, sample: null, mcp: null, limits: null, lists: [], listId: null, scans: new Map(), live: new Map(),
+  filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false,
+  buys: [], unsubBuys: null, openBuy: null, gone: new Set(), mem: new Map() };
+const listOf = () => S.lists.find(l => l.id === S.listId) || null;
+/* wie gebruikt deze telefoon: iedereen eigen lijsten, inkopen en afronden; lijsten zonder eigenaar zijn van iedereen */
+const ME = { name: (() => { try { return localStorage.getItem("kaartscan.wie") || ""; } catch { return ""; } })() };
+const NAMES = ["Mees", "Plien"];
+const mine = l => !l.door || !ME.name || l.door === ME.name;
+const ownerOf = l => l && l.door && l.door !== ME.name ? l.door : "";
+function pickDefaultList() {
+  let want = null; try { want = localStorage.getItem("kaartscan.list"); } catch {}
+  const w = S.lists.find(l => l.id === want);
+  return (w && mine(w) ? w : null) || S.lists.find(l => ME.name && l.door === ME.name) || S.lists.find(mine) || null;
+}
+function setMe(name) {
+  ME.name = name; try { localStorage.setItem("kaartscan.wie", name); } catch {}
+  const l = listOf(); if (l && !mine(l)) { const p = pickDefaultList(); if (p) selectList(p.id); else clearSelection(); }
+  else if (!l) { const p = pickDefaultList(); if (p) selectList(p.id); }
+  render();
+}
+function clearSelection() {
+  S.listId = null; S.open = null; S.openBuy = null; S.scans = new Map(); if (!S.local) S.buys = [];
+  if (S.unsubScans) { S.unsubScans(); S.unsubScans = null; } if (S.unsubBuys) { S.unsubBuys(); S.unsubBuys = null; }
+  try { localStorage.removeItem("kaartscan.list"); } catch {}
+  if (S.local) loadLocal();          // lokaal staan alle lijsten in één opslag, die niet kwijtraken
+}
+function openWho(then) {
+  const known = [...new Set([...NAMES, ...S.lists.map(l => l.door).filter(Boolean)])];
+  const sh = sheet(`<h3>Wie gebruikt deze telefoon?</h3>
+    <p class="fine" style="margin:0">Iedereen heeft eigen lijsten, inkopen en dag afronden. Elkaars lijsten kun je wel openen via Lijsten.</p>
+    <div class="chips">${known.map(n => `<button class="chip" data-who="${esc(n)}" aria-pressed="${n === ME.name}">${esc(n)}</button>`).join("")}</div>
+    <div class="row"><input class="field" id="whoIn" placeholder="Andere naam" autocomplete="off" style="flex:1;min-width:0"><button class="btn" data-who-in="1">Kies</button></div>`,
+    (e, close) => {
+      const c = e.target.closest("[data-who]"), i = e.target.closest("[data-who-in]");
+      const n = c ? c.dataset.who : i ? $("#whoIn", sh.el).value.trim().slice(0, 24) : ""; if (!n) return;
+      close(); setMe(n); toast(`Je bent ${n} op deze telefoon`); if (then) then();
+    });
+}
+const pct = () => { const l = listOf(); return l && Number.isFinite(l.pct) ? l.pct : 70; };
+const chains = new Map();
+function serial(path, fn) { const p = (chains.get(path) || Promise.resolve()).then(fn, fn); chains.set(path, p.catch(() => {})); return p; }
+
+function saveLocal() {
+  if (!S.local) return;
+  try { localStorage.setItem("kaartscan", JSON.stringify({ lists: S.lists, scans: [...S.scans.values()], buys: S.buys })); } catch {}
+}
+function loadLocal() {
+  try { const j = JSON.parse(localStorage.getItem("kaartscan") || "null"); if (j) { S.lists = j.lists || []; (j.scans || []).forEach(s => S.scans.set(s.id, s)); S.buys = j.buys || []; } } catch {}
+}
+async function putList(l) {
+  const i = S.lists.findIndex(x => x.id === l.id); if (i >= 0) S.lists[i] = l; else S.lists.unshift(l);
+  if (S.db) await serial("lijsten/" + l.id, () => S.db.doc("lijsten/" + l.id).set(stripId(l))); else saveLocal();
+}
+function stripId(o) { const { id, ...rest } = o; return rest; }
+async function putScan(s) {
+  if (S.gone.has(s.id)) return;                              // net verwijderd terwijl hij nog gelezen werd: niet terugzetten
+  const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null, pct: isNum(s.pct) ? s.pct : null, trend: typeof s.trend === "boolean" ? s.trend : null,
+    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, revAuto: !!k.revAuto, revManual: !!k.revManual, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null, pct: isNum(k.pct) ? k.pct : null })) };
+  if (S.db) {
+    const path = `lijsten/${s.list}/scans/${s.id}`;
+    try { await serial(path, () => S.db.doc(path).set(body)); }
+    catch (e) {
+      if (e && e.code === "invalid_argument" || e && e.code === "quota_exceeded") {
+        body.kaarten = body.kaarten.map(k => ({ ...k, thumb: null })); body.foto = null;
+        await serial(path, () => S.db.doc(path).set(body)); toast("Opgeslagen zonder plaatjes, de opslag is vol");
+      } else throw e;
+    }
+  } else { S.scans.set(s.id, s); saveLocal(); }
+}
+async function deleteScanDoc(s) {
+  S.gone.add(s.id); S.queue = S.queue.filter(j => j.id !== s.id); S.bitmaps.delete(s.id);
+  if (S.db) await serial(`lijsten/${s.list}/scans/${s.id}`, () => S.db.doc(`lijsten/${s.list}/scans/${s.id}`).delete());
+  S.scans.delete(s.id); S.live.delete(s.id); saveLocal();
+}
+function watchLists() {
+  S.db.collection("lijsten").orderBy("t", "desc").limit(200).onSnapshot(snap => {
+    S.lists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!S.listId || !S.lists.some(l => l.id === S.listId)) {
+      const pick = pickDefaultList();
+      if (pick) selectList(pick.id); else if (S.listId) clearSelection();
+    }
+    render();
+  }, e => toast("Lijsten laden lukt niet: " + (e && e.code || "fout")));
+}
+function selectList(id) {
+  S.listId = id; try { localStorage.setItem("kaartscan.list", id); } catch {}
+  S.open = null; S.openBuy = null; S.scans = new Map(); if (!S.local) S.buys = [];
+  if (S.unsubScans) { S.unsubScans(); S.unsubScans = null; }
+  if (S.unsubBuys) { S.unsubBuys(); S.unsubBuys = null; }
+  if (S.db && id) {
+    S.unsubScans = S.db.doc("lijsten/" + id).collection("scans").orderBy("t", "desc").limit(1000).onSnapshot(snap => {
+      const m = new Map(); snap.docs.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
+      S.scans = m;
+      for (const [sid, l] of S.live) if (m.has(sid) && (l.status === "klaar" || l.status === "leeg")) S.live.delete(sid);
+      render();
+    }, e => toast("Scans laden lukt niet: " + (e && e.code || "fout")));
+    S.unsubBuys = S.db.doc("lijsten/" + id).collection("inkopen").orderBy("t", "desc").limit(500).onSnapshot(snap => {
+      S.buys = snap.docs.map(d => ({ id: d.id, list: id, ...d.data() })); render();
+    }, e => toast("Inkopen laden lukt niet: " + (e && e.code || "fout")));
+  } else if (S.local) { loadLocal(); }
+  render();
+}
+async function newList(name) {
+  const now = new Date(); const l = { id: uid(), naam: name || `Beurs ${fmtDate(now)}`, t: Date.now(), pct: pct(), door: ME.name || null };
+  await putList(l); selectList(l.id); return l;
+}
+async function ensureList() { if (!listOf()) await newList(); return listOf(); }
+
+/* ---------------------------------------------------------------- scannen */
+const STEP1 = `You are reading a phone photo of Pokémon trading cards: usually one binder page in a 3x3 grid, sometimes loose cards on a table.
+List every card that is fully or mostly visible, row by row, left to right. Skip empty pockets, and skip cards that are cut off at the photo edge or belong to the facing page.
+Write exactly one line of JSON per card and nothing else (no code fence, no commentary):
+{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"level":null,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","reverse":false,"lang":"en","sticker":null}
+box: the card outline as fractions (0 to 1) of the photo width and height.
+name: exactly as printed, with ex, V, VMAX, VSTAR, GX and owner prefixes such as N's, Misty's or Team Rocket's. Trainers and energy: the card title.
+hp: the number, or null. level: the LV. number printed next to the name on Diamond & Pearl and Platinum era cards (like 46), else null; keep it out of the name. attacks: up to two ability or attack names as printed.
+set and number: from the small print along the bottom edge. Newer cards (Sword & Shield, Scarlet & Violet, Mega Evolution) print a letter code and number bottom left, like "MEW" and "205/165" or "SVP" and "053". Older cards (Sun & Moon, XY, Black & White and earlier) print only a set symbol and the number, usually bottom right, like "101/108": then set is null. Only fill them in if you can really read them, else null. Never guess.
+art: "full" when the artwork covers the whole card (illustration rare, full art, special illustration rare, gold), else "regular".
+reverse: true only for a regular card whose frame, borders and text box (everything outside the artwork window) clearly shine with holographic foil (rainbow, glitter or pattern) while the artwork itself is flat. Glare on a sleeve or binder page is not foil. false when the card body is plain or when unsure.
+lang: the card language as a code, like "en", "ja", "ko", "de".
+sticker: the text of a price sticker on the sleeve, else null.`;
+const STEP2 = `Each image holds one or more horizontal strips. Every strip is the bottom edge of one Pokémon card and has a yellow label #1, #2 and so on in its top left corner.
+For every strip, read the collector number printed along the bottom edge of the card.
+Newer cards print it bottom left, after a letter set code such as MEW, PAF, OBF, SVP, MEP, JTG (often followed by EN).
+Older cards (Sun & Moon, XY, Black & White and earlier) print it bottom right next to a set symbol, without a letter code.
+Formats look like 101/108, 205/165, 053, TG13/TG30, SV41/SV94, RC5/RC32, GG01/GG70, SWSH291, XY121, BW45, SM210.
+Also say whether the card surface in the strip (text box, borders, weakness bar) shows the holographic foil of a reverse holo: a rainbow, glitter or repeating shiny pattern across the card itself. Plain glossy or matte card is not reverse, and glare on a sleeve is not foil.
+Write exactly one line of JSON per strip and nothing else: {"i":1,"set":"MEW","number":"205/165","reverse":false}
+set is the letter code only when one is printed, else null. reverse is true, false, or null when you cannot tell. Use null for anything you cannot read with certainty. Never guess.`;
+/* stap 2: alleen de onderrand van elke kaart, scherp en met wat extra contrast, drie per afbeelding. Weinig tokens, wel goed leesbaar. */
+const STRIP_W = 1000, STRIP_H = 300, STRIP_GAP = 16, STRIPS_PER_IMG = 3;
+function autoLevels(g, w, h) {                                        // donkere of flauwe foto: grijswaarden oprekken
+  const d = g.getImageData(0, 0, w, h), a = d.data, hist = new Uint32Array(256); let n = 0;
+  for (let i = 0; i < a.length; i += 16) { hist[(a[i] * 77 + a[i + 1] * 150 + a[i + 2] * 29) >> 8]++; n++; }
+  let lo = 0, hi = 255, acc = 0;
+  for (; lo < 254; lo++) { acc += hist[lo]; if (acc > n * 0.01) break; }
+  acc = 0; for (; hi > 1; hi--) { acc += hist[hi]; if (acc > n * 0.01) break; }
+  if (hi - lo < 30 || (lo <= 10 && hi >= 245)) return;
+  const sc = 255 / (hi - lo);
+  for (let i = 0; i < a.length; i += 4) { a[i] = (a[i] - lo) * sc; a[i + 1] = (a[i + 1] - lo) * sc; a[i + 2] = (a[i + 2] - lo) * sc; }
+  g.putImageData(d, 0, 0);
+}
+function stripCanvas(bm, box, dim) {
+  const p = boxPx(bm, box, 0.03, dim); if (!p) return null;
+  const [x, y, w, h] = p, rh = Math.min(h, w * 0.3);
+  const c = canvasOf(STRIP_W, STRIP_H), g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+  g.drawImage(bm, x, y + h - rh, w, rh, 0, 0, STRIP_W, STRIP_H); autoLevels(g, STRIP_W, STRIP_H); return c;
+}
+async function stripImages(bm, ks, dim) {
+  const out = [];
+  for (let i = 0; i < ks.length; i += STRIPS_PER_IMG) {
+    const part = ks.slice(i, i + STRIPS_PER_IMG);
+    const c = canvasOf(STRIP_W, part.length * STRIP_H + (part.length - 1) * STRIP_GAP), g = c.getContext("2d");
+    g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+    part.forEach((k, j) => {
+      const y = j * (STRIP_H + STRIP_GAP), sc = stripCanvas(bm, k.box, dim); if (sc) g.drawImage(sc, 0, y);
+      g.fillStyle = "#ffe14d"; g.fillRect(0, y, 70, 42); g.fillStyle = "#000"; g.font = "bold 32px sans-serif"; g.fillText("#" + (i + j + 1), 6, y + 33);
+    });
+    out.push(await toBlob(c, 0.9));
+  }
+  return out;
+}
+
+function parseLine(line) {
+  const s = line.trim().replace(/^```(json)?/, "").replace(/```$/, "").replace(/^[-*\d.)\s]+(?=\{)/, "").replace(/,$/, "");
+  if (!s.startsWith("{")) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+function addFiles(files) {
+  const arr = [...files].filter(f => f && f.type !== "" ? f.type.startsWith("image/") : true);
+  if (!arr.length) return;
+  ensureList().then(list => {
+    for (const f of arr) {
+      const s = { id: uid(), list: list.id, t: Date.now(), status: "wacht", kaarten: [], foto: null, n: 0, _v: 0 };
+      S.live.set(s.id, s); S.queue.push({ id: s.id, file: f, tier: "quick" });
+    }
+    render(); pump();
+  });
+}
+function pump() {
+  if (!navigator.onLine) { render(); return; }
+  while (S.running < 2 && S.queue.length) { const job = S.queue.shift(); S.running++; runJob(job).finally(() => { S.running--; render(); pump(); }); }
+  render();
+}
+window.addEventListener("online", () => { for (const s of S.live.values()) if (s.status === "offline") { s.status = "wacht"; } pump(); });
+
+function errText(e) {
+  const c = e && e.code;
+  if (c === "not_granted") return "Claude mag deze pagina niet gebruiken. Sta het toe en probeer opnieuw.";
+  if (c === "rate_limited") return "Even te veel tegelijk of je gebruikslimiet is bereikt. Probeer zo opnieuw.";
+  if (c === "images_unavailable") return "Foto's versturen kan niet in deze weergave. Open de pagina in de Claude app of op claude.ai.";
+  if (c === "image_rejected") return "Deze foto wordt niet geaccepteerd. Maak een nieuwe foto.";
+  if (c === "session_expired") return "Je bent uitgelogd. Log opnieuw in op claude.ai.";
+  if (c === "sampling_disabled") return "Claude is niet beschikbaar voor dit account.";
+  return "Lezen mislukt. Controleer je verbinding en probeer opnieuw.";
+}
+async function runJob(job) {
+  const s = S.live.get(job.id); if (!s) return;
+  if (!S.sample) { s.status = "fout"; s.err = "Claude vragen is niet beschikbaar in deze weergave. Open de pagina in de Claude app of op claude.ai."; s._v++; return; }
+  if (!navigator.onLine) { s.status = "offline"; S.queue.unshift(job); s._v++; return; }
+  try {
+    let bm = S.bitmaps.get(s.id);
+    if (!bm) { bm = await toBitmap(job.file); keepBitmap(s.id, bm); }
+    if (!s.foto) s.foto = photoThumb(bm);
+    s.status = "lezen"; s.err = null; s.kaarten = []; s._v++; render();
+    const f1 = Math.min(1, Math.sqrt(1150000 / (bm.width * bm.height))); s.dim = [Math.round(bm.width * f1), Math.round(bm.height * f1)];
+    const blob = await scaled(bm, 1150000, 0.86);
+    let pending = "";
+    const take = line => {
+      const r = parseLine(line); if (!r || !(r.name || r.box)) return;
+      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, level: r.level || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null, reverse: r.reverse === true }, rev: false, eigen: null };
+      applyId(k, identify(k.lez)); autoRev(k, k.lez.reverse); k.thumb = k.box ? thumbOf(bm, k.box, s.dim) : null;
+      s.kaarten.push(k); S.fresh.add(k.k); s._v++; render();
+    };
+    const opts = { images: [blob], modelTier: job.tier, onText: ({ delta }) => { const lines = (pending + delta).split("\n"); pending = lines.pop(); lines.forEach(take); } };
+    if (job.tier === "default") opts.effort = "low";
+    if (job.retry) opts.cache = false;
+    await S.sample(STEP1, opts);
+    if (pending.trim()) take(pending);
+    if (!s.kaarten.length) { s.status = "leeg"; s._v++; await persist(s); return; }
+    const need = s.kaarten.filter(k => (k.st !== "ok" || k.rev) && k.box && !k.lang);
+    if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need); }
+    if (IMG_ON) await visualOrder(s, bm).catch(() => {});
+    s.status = "klaar"; s.n = s.kaarten.length; s._v++; render();
+    await shrinkKept(s.id, bm);
+    await persist(s);
+  } catch (e) {
+    if (e && e.code === "cancelled") return;
+    if (!navigator.onLine || (e && e.code === "upstream_error" && !navigator.onLine)) { s.status = "offline"; S.queue.unshift(job); }
+    else { s.status = "fout"; s.err = errText(e); s.retryJob = job; }
+    s._v++; render();
+  }
+}
+async function readNumbers(s, bm, need) {
+  const ks = need.filter(k => k.box); if (!ks.length) return;
+  const imgs = await stripImages(bm, ks, s.dim);
+  const max = (S.limits && S.limits.images && S.limits.images.maxCount) || 5;
+  for (let i = 0; i < imgs.length; i += max) {
+    try {                                                              // kleine plaatjes, dus het nauwkeurige model kost weinig
+      const { text } = await S.sample(STEP2, { images: imgs.slice(i, i + max), modelTier: "default", effort: "low" });
+      text.split("\n").map(parseLine).filter(Boolean).forEach(r => {
+        const k = ks[Number(r.i) - 1]; if (!k) return;
+        if (r.set) k.lez.set = r.set; if (r.number) k.lez.number = r.number;
+        if (k.st !== "ok" || r.set || r.number) applyId(k, identify(k.lez));
+        k.lez.reverse = r.reverse === true;                            // reverse alleen als de scherpe onderrand het bevestigt
+        autoRev(k, k.lez.reverse);
+      });
+      s._v++; render();
+    } catch (e) { if (e && (e.code === "not_granted" || e.code === "rate_limited")) throw e; }
+  }
+}
+/* twijfel tussen versies (gewoon, full art, andere set): vergelijk de kaart op de foto met de echte scans. Kost geen tokens.
+   Kleur en opbouw op 12 bij 16 vlakjes, per kleurkanaal genormaliseerd zodat licht en witbalans weinig uitmaken. */
+const REF = new Map();
+function featOf(src, x, y, w, h) {
+  const ix = w * 0.07, iy = h * 0.05, c = canvasOf(12, 16), g = c.getContext("2d");
+  g.drawImage(src, x + ix, y + iy, w - 2 * ix, h - 2 * iy, 0, 0, 12, 16);
+  const d = g.getImageData(0, 0, 12, 16).data, n = 192, f = new Float32Array(n * 3);
+  for (let ch = 0; ch < 3; ch++) {
+    let m = 0; for (let i = 0; i < n; i++) m += d[i * 4 + ch]; m /= n;
+    let v = 0; for (let i = 0; i < n; i++) v += (d[i * 4 + ch] - m) ** 2; const sd = Math.sqrt(v / n) || 1;
+    for (let i = 0; i < n; i++) f[ch * n + i] = (d[i * 4 + ch] - m) / sd;
+  }
+  return f;
+}
+function refFeat(card) {
+  if (!REF.has(card.key)) REF.set(card.key, (async () => { const img = new Image(); img.src = imgOf(card); await img.decode(); return featOf(img, 0, 0, img.naturalWidth, img.naturalHeight); })().catch(() => null));
+  return REF.get(card.key);
+}
+async function visualOrder(s, bm) {
+  await Promise.all(s.kaarten.map(async k => {
+    if (k.st !== "check" || !k.box || !k.sid) return;
+    const all = [CAT.byKey.get(k.sid + "|" + k.lid), ...(k.alts || []).map(([a, b]) => CAT.byKey.get(a + "|" + b))].filter(Boolean);
+    const cands = all.filter(c => imgOf(c)).slice(0, 6); if (cands.length < 2) return;
+    const p = boxPx(bm, k.box, 0, s.dim); if (!p) return;
+    const uf = featOf(bm, ...p);
+    const scored = (await Promise.all(cands.map(async c => { const f = await refFeat(c); if (!f) return null; let d = 0; for (let i = 0; i < f.length; i++) d += (f[i] - uf[i]) ** 2; return [d / f.length, c]; }))).filter(Boolean).sort((a, b) => a[0] - b[0]);
+    if (scored.length < 2 || !(scored[0][0] < scored[1][0] * 0.85)) return;   // alleen bij een duidelijk verschil
+    const order = [...scored.map(x => x[1]), ...all.filter(c => !scored.some(x => x[1] === c))];
+    k.sid = order[0].sid; k.lid = order[0].lid; k.alts = order.slice(1, 9).map(c => [c.sid, c.lid]);
+  }));
+  s._v++; render();
+}
+async function persist(s) {
+  if (!S.db && !S.local) return;
+  try { await putScan(s); if (!S.db) { S.live.delete(s.id); render(); } }
+  catch (e) { s.err = "Opslaan mislukt. De kaarten blijven zichtbaar tot je de pagina sluit."; s._v++; render(); }
+}
+async function shrinkKept(id, bm) {          // volle resolutie is alleen nodig tijdens het lezen; daarna een kleinere kopie voor opnieuw lezen
+  const f = Math.min(1, 2400 / Math.max(bm.width, bm.height)); if (f >= 1) return;
+  try {
+    const c = canvasOf(bm.width * f, bm.height * f); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+    const small = await createImageBitmap(c); if (S.bitmaps.get(id) === bm) { S.bitmaps.set(id, small); try { bm.close(); } catch {} }
+  } catch {}
+}
+function keepBitmap(id, bm) {
+  S.bitmaps.set(id, bm);
+  while (S.bitmaps.size > 4) { const [old, b] = S.bitmaps.entries().next().value; try { b.close(); } catch {} S.bitmaps.delete(old); }
+}
+function retryScan(s, tier) {
+  const bm = S.bitmaps.get(s.id); const job = s.retryJob || null;
+  if (!bm && !(job && job.file)) { toast("De foto is niet meer in het geheugen. Maak een nieuwe foto."); return; }
+  const live = { ...s, kaarten: [], status: "wacht", _v: (s._v || 0) + 1, err: null };
+  S.live.set(s.id, live);
+  S.queue.push({ id: s.id, file: job ? job.file : null, tier: tier || "quick", retry: true }); pump();
+}
+
+/* ---------------------------------------------------------------- bewerken */
+function allScans() {
+  const m = new Map(S.scans); for (const [id, l] of S.live) m.set(id, l);
+  return [...m.values()].filter(s => (s.list === S.listId || !s.list) && !S.gone.has(s.id)).sort((a, b) => b.t - a.t);
+}
+function scanById(id) { return S.live.get(id) || S.scans.get(id); }
+async function mutateScan(scanId, fn) {
+  const s = scanById(scanId); if (!s) return;
+  if (S.live.has(scanId) && s.status !== "klaar") { fn(s); s.kaarten = s.kaarten.filter(x => !x._del); s._v++; render(); return; }
+  const copy = { ...s, kaarten: s.kaarten.map(k => ({ ...k })) };
+  fn(copy);
+  copy.kaarten = copy.kaarten.filter(x => !x._del); copy.n = copy.kaarten.length; copy._v = (s._v || 0) + 1;
+  if (!copy.kaarten.length && copy.status === "klaar") { S.live.delete(scanId); S.scans.delete(scanId); render(); await deleteScanDoc(copy).catch(() => {}); return; }
+  if (S.live.has(scanId)) { S.live.set(scanId, copy); render(); if (copy.status === "klaar") await persist(copy); return; }
+  S.scans.set(scanId, copy); render();
+  try { await putScan(copy); } catch { toast("Opslaan mislukt, probeer het opnieuw"); }
+}
+function editCard(scanId, key, fn) { return mutateScan(scanId, s => { const k = s.kaarten.find(x => x.k === key); if (k) fn(k, s); }); }
+async function restoreScan(prev) {
+  const s = { ...prev, kaarten: prev.kaarten.map(k => ({ ...k })), _v: (prev._v || 0) + 7 };
+  if (S.live.has(s.id) && S.live.get(s.id).status !== "klaar") { S.live.set(s.id, s); render(); return; }
+  S.scans.set(s.id, s); render();
+  try { await putScan(s); } catch { toast("Terugzetten mislukt"); }
+}
+function deleteCard(scanId, key) {
+  const s = scanById(scanId); if (!s) return;
+  const prev = { ...s, kaarten: s.kaarten.map(k => ({ ...k })) };
+  const k = s.kaarten.find(x => x.k === key); const nm = k ? (priceOf(k).card || { name: k.lez.name }).name : "Kaart";
+  if (S.open === key) S.open = null;
+  editCard(scanId, key, k => { k._del = true; });
+  toast(`${nm} verwijderd`, 5000, { label: "Ongedaan maken", fn: () => restoreScan(prev) });
+}
+/* bod %: kaart gaat voor foto, foto gaat voor de lijst */
+const priceVal = k => isNum(k.eigen) ? k.eigen : isNum(k.low) ? k.low : null;   // één prijs per kaart (oude eigen prijs telt nog mee)
+const pctOf = (k, s) => isNum(k && k.pct) ? k.pct : isNum(s && s.pct) ? s.pct : pct();
+/* trend staat standaard uit: dan rekent het bod alleen met de ingevulde prijs. Aan per lijst (Bod ▾) of per foto (⋯) */
+const listTrend = () => { const l = listOf(); return !!(l && l.trend); };
+const trendOn = s => typeof (s && s.trend) === "boolean" ? s.trend : listTrend();
+/* prijsgeheugen van het team: elke handmatig ingevulde prijs per kaart (en reverse), gedeeld tussen jullie telefoons.
+   Staat klaar bij dezelfde kaart zolang hij niet ouder is dan MEM_DAYS; een eigen prijs gaat altijd voor. */
+const MEM_DAYS = 14;
+const memKey = (sid, lid, rev) => `${sid}~${lid}${rev ? "~r" : ""}`.replace(/[^A-Za-z0-9_\-.~:@+]/g, "_");
+function memFor(k) {
+  if (!k || !k.sid) return null;
+  const m = S.mem.get(memKey(k.sid, k.lid, k.rev));
+  return m && isNum(m.p) && Date.now() - m.t < MEM_DAYS * 864e5 ? m : null;
+}
+const teamOf = k => priceVal(k) == null ? memFor(k) : null;            // alleen als er nog geen eigen prijs is
+const effPrice = k => { const v = priceVal(k); if (v != null) return v; const m = memFor(k); return m ? m.p : null; };
+const moneyIn = v => (Math.round(v * 100) / 100).toFixed(2).replace(".", ",");   // 12.5 in een veld als 12,50
+const memWho = m => !m.door ? "Team" : m.door === ME.name ? "Jij" : m.door;
+function agoText(t) {
+  const day = x => { const d = new Date(x); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  const n = Math.round((day(Date.now()) - day(t)) / 864e5);
+  return n <= 0 ? "vandaag " + fmtTime(t) : n === 1 ? "gisteren" : fmtDate(new Date(t));
+}
+const memText = m => m.door && m.door === ME.name ? `Eerder door jou ingevuld, ${agoText(m.t)}` : `Prijs van ${memWho(m)}, ${agoText(m.t)}`;
+function watchMem() {
+  if (!S.db) { try { const j = JSON.parse(localStorage.getItem("kaartscan.mem") || "null"); if (j) Object.entries(j).forEach(([id, m]) => S.mem.set(id, m)); } catch {} return; }
+  const from = Date.now() - MEM_DAYS * 864e5, col = S.db.collection("prijzen");
+  let q; try { q = col.where("t", ">", from).orderBy("t", "desc").limit(1000); } catch { q = col.orderBy("t", "desc").limit(1000); }
+  q.onSnapshot(snap => {
+    const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
+    const now = Date.now(); for (const [id, v] of S.mem) if (now - v.t < 60000 && (!m.has(id) || m.get(id).t < v.t)) m.set(id, v);   // net zelf ingevuld, nog onderweg
+    S.mem = m; render();
+  }, () => {});
+}
+async function rememberPrice(k, v, old) {
+  if (!k || !k.sid || !CAT.byKey.get(k.sid + "|" + k.lid)) return;
+  const id = memKey(k.sid, k.lid, k.rev), prev = S.mem.get(id), me = ME.name || "";
+  if (v == null) {                                         // eigen prijs gewist: ook uit het geheugen als het die van jou was
+    if (!prev || prev.door !== me || prev.p !== old) return;
+    S.mem.delete(id);
+    if (S.db) await serial("prijzen/" + id, () => S.db.doc("prijzen/" + id).delete()).catch(() => {}); else saveMem();
+    return;
+  }
+  const m = { sid: k.sid, lid: k.lid, rev: !!k.rev, p: v, t: Date.now(), door: me };
+  S.mem.set(id, m);
+  if (S.db) await serial("prijzen/" + id, () => S.db.doc("prijzen/" + id).set(m)).catch(() => {}); else saveMem();
+}
+function saveMem() { try { localStorage.setItem("kaartscan.mem", JSON.stringify(Object.fromEntries(S.mem))); } catch {} }
+function priceOf(k, s) {
+  const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
+  const trend = card ? trendOf(card, k.rev) : null, useT = trendOn(s);
+  const own = Number.isFinite(k.eigen) && k.eigen !== null, low = Number.isFinite(k.low) && k.low !== null;
+  const team = !own && !low && card ? memFor(k) : null;
+  const base = own ? k.eigen : low ? k.low : team ? team.p : useT ? trend : null; const p = pctOf(k, s);
+  return { card, trend, base, pct: p, useT, team, src: own ? "eigen" : low ? "low" : team ? "team" : useT ? "trend" : "open", bod: base != null ? round2(base * p / 100) : null };
+}
+async function setListTrend(v) {
+  const l = await ensureList(); await putList({ ...l, trend: v }).catch(() => toast("Opslaan mislukt")); $("#pctRow").dataset.p = ""; render();
+  toast(v ? "Trend aan: zichtbaar en telt mee als er geen prijs is" : "Trend uit: bod alleen op de prijs die je invult", 3500);
+}
+function setScanTrend(sId) {
+  const s = scanById(sId); if (!s) return; const v = !trendOn(s);
+  mutateScan(sId, x => { x.trend = v === listTrend() ? null : v; });
+  toast(v ? "Trend aan voor deze foto" : "Trend uit voor deze foto");
+}
+function overrides() {
+  let f = 0, c = 0;
+  for (const s of allScans()) { if (isNum(s.pct)) f++; for (const k of s.kaarten || []) if (isNum(k.pct)) c++; }
+  return { f, c, any: f + c > 0 };
+}
+function parsePct(v) { const n = Math.round(parseFloat(String(v || "").replace(",", ".").replace(/[^\d.]/g, ""))); return Number.isFinite(n) && n > 0 ? Math.min(200, n) : null; }
+function setScanPct(sId, v) { mutateScan(sId, s => { s.pct = v; }); toast(v == null ? `Foto volgt weer de lijst, ${pct()}%` : `Bod voor deze foto: ${v}%`); }
+async function resetOverrides() {
+  for (const s of allScans()) if (isNum(s.pct) || (s.kaarten || []).some(k => isNum(k.pct)))
+    await mutateScan(s.id, x => { x.pct = null; x.kaarten.forEach(k => { k.pct = null; }); });
+  toast(`Alles weer op ${pct()}%`);
+}
+
+/* ---------------------------------------------------------------- tekenen */
+let rendering = false;
+const bannerEl = document.createElement("div"); bannerEl.style.display = "grid"; bannerEl.style.gap = "14px";
+const buyEl = document.createElement("div"); buyEl.style.display = "grid"; buyEl.style.gap = "14px";
+document.addEventListener("animationend", e => { if (e.target.classList && e.target.classList.contains("fresh")) e.target.classList.remove("fresh"); });
+const cardSig = k => [k.k, k.st, k.sid || null, k.lid || null, !!k.rev, isNum(k.eigen) ? k.eigen : null, isNum(k.low) ? k.low : null, k.lowT || null, isNum(k.pct) ? k.pct : null,
+  (k.alts || []).length, !!k.thumb, k.lez ? [k.lez.name || "", k.lez.number || "", k.lez.sticker || ""].join("|") : "", k.lang || null,
+  (m => m ? m.p + "@" + m.door + "@" + m.t : null)(teamOf(k))];
+/* nooit in of uitzoomen: knijpen en dubbeltikken uit, de app past altijd precies op het scherm */
+["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener("touchmove", e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+function render() { if (rendering) return; rendering = true; requestAnimationFrame(() => { rendering = false; draw(); }); }
+const groupCache = new Map();
+function draw() {
+  const list = listOf(); const scans = allScans();
+  $("#listName").textContent = list ? list.naam + (ownerOf(list) ? " · " + ownerOf(list) : "") : "Kaartscan";
+  let n = 0, tr = 0, of = 0, chk = 0, open = 0, mk = 0;
+  for (const s of scans) for (const k of s.kaarten || []) { n++; const p = priceOf(k, s); if (p.trend) tr += p.trend; if (p.bod) of += p.bod; if (p.base) mk += p.base; if (p.src === "open") open++; if (k.st !== "ok") chk++; }
+  $("#sCount").textContent = n; $("#sTrend").textContent = EUR.format(tr); $("#sOffer").textContent = EUR.format(of); $("#sMarket").textContent = EUR.format(mk) + " markt";
+  $("#sTrendRow").hidden = !listTrend(); $("#sOpen").hidden = !open; $("#sOpen").textContent = `${open} zonder prijs`;
+  $("#pctLbl").textContent = pct() + "%" + (listTrend() ? " · trend" : ""); $("#checkCnt").textContent = chk;
+  const waiting = S.queue.length + S.running;
+  $("#queue").textContent = !navigator.onLine && [...S.live.values()].some(s => s.status === "offline") ? "Geen verbinding, foto's wachten" : waiting ? `${waiting} ${waiting === 1 ? "foto" : "foto's"} bezig` : "";
+  $("#tDate").textContent = PR.datum ? fmtDate(parseDate(PR.datum)) : "";
+  const buys = listBuys(); $("#buyCnt").textContent = buys.length || "";
+  $("#buyBtn").hidden = !n || S.filter === "buy"; $("#buySub").textContent = EUR.format(of);
+  $("#tabCheck").hidden = !(chk || S.filter === "check"); $("#tabBuy").hidden = !(buys.length || S.filter === "buy");
+  $("#tabAll").hidden = S.filter === "all"; $("#lowBtn").hidden = !n || S.filter !== "all";
+  $("#chips").hidden = ["#tabCheck", "#tabBuy", "#tabAll", "#lowBtn"].every(id => $(id).hidden);
+  drawPct();
+  const feed = $("#feed"); const keep = new Set(); const nodes = [];
+  let html = !CAT.ready ? (S.loadError ? `<div class="notice"><b>De kaartendatabase kon niet laden.</b> Ververs de pagina.</div>` : `<div class="notice">Kaartendatabase laden…</div>`) : bannerHtml();
+  if (CAT.ready && !scans.length && S.filter !== "buy") html += emptyHtml();
+  if (bannerEl.dataset.h !== html) { bannerEl.innerHTML = html; bannerEl.dataset.h = html; }
+  if (S.filter === "buy" && CAT.ready) {
+    const bh = buysHtml(); if (buyEl.dataset.h !== bh) { buyEl.innerHTML = bh; buyEl.dataset.h = bh; }
+    [bannerEl, buyEl].forEach((node, i) => { if (feed.children[i] !== node) feed.insertBefore(node, feed.children[i] || null); });
+    while (feed.children.length > 2) feed.lastElementChild.remove();
+    return;
+  }
+  if (!CAT.ready) scans.length = 0;
+  for (const s of scans) {
+    const ks = (s.kaarten || []).filter(k => S.filter === "all" || k.st !== "ok");
+    if (S.filter === "check" && !ks.length && !["lezen", "nummers", "wacht", "fout", "offline"].includes(s.status)) continue;
+    const openHere = S.open && (s.kaarten || []).some(k => k.k === S.open) ? S.open : "";
+    // inhoud, geen versienummer: een sync die niets verandert bouwt niets opnieuw, dus een veld met focus blijft staan
+    const sig = [s.id, s.t, !!s.hand, s.status, s.err || "", ks.length, pct(), isNum(s.pct) ? s.pct : null, listTrend(), typeof s.trend === "boolean" ? s.trend : null, S.filter, openHere, openHere && S.vers === openHere ? 1 : 0, PR.datum, JSON.stringify((s.kaarten || []).map(cardSig))].join("~");
+    let g = groupCache.get(s.id);
+    if (!g || g.sig !== sig) { const el = document.createElement("section"); el.className = "scan"; el.innerHTML = scanHtml(s, ks); g = { sig, el }; groupCache.set(s.id, g); }
+    keep.add(s.id); nodes.push(g.el);
+  }
+  for (const id of groupCache.keys()) if (!keep.has(id)) groupCache.delete(id);
+  const want = [bannerEl, ...nodes];
+  want.forEach((node, i) => { if (feed.children[i] !== node) feed.insertBefore(node, feed.children[i] || null); });
+  while (feed.children.length > want.length) feed.lastElementChild.remove();
+  S.fresh.clear();
+}
+function bannerHtml() {
+  const notes = [];
+  if (S.boot && !S.sample) notes.push(`<div class="notice"><b>Scannen werkt alleen in de Claude app of op claude.ai.</b> Open deze pagina daar om foto's te laten lezen.</div>`);
+  if (S.boot && S.sample && S.limits && !S.limits.images) notes.push(`<div class="notice"><b>Foto's versturen is hier niet beschikbaar.</b> Open de pagina in de Claude app of op claude.ai.</div>`);
+  if (S.local) notes.push(`<div class="notice">Lijsten worden alleen op dit apparaat bewaard.</div>`);
+  return notes.join("");
+}
+function emptyHtml() {
+  return `<div class="empty"><div class="ghostgrid">${"<i></i>".repeat(9)}</div>
+    <h2>Scan je eerste pagina</h2>
+    <p>Tik op de camera en fotografeer een binderpagina recht van boven.</p>
+    <p class="fine">Meerdere foto's tegelijk kiezen kan met het knopje links onderin.</p></div>`;
+}
+function statusPill(s) {
+  const c = (s.kaarten || []).filter(k => k.st !== "ok").length;
+  switch (s.status) {
+    case "wacht": return `<span class="pill busy"><span class="dot"></span>In de rij</span>`;
+    case "lezen": return `<span class="pill busy"><span class="dot"></span>Lezen</span>`;
+    case "nummers": return `<span class="pill busy"><span class="dot"></span>Nummers checken</span>`;
+    case "offline": return `<span class="pill warn">Wacht op verbinding</span>`;
+    case "fout": return `<span class="pill bad">Mislukt</span>`;
+    case "leeg": return `<span class="pill">Geen kaarten gevonden</span>`;
+    case "klaar": return "";
+    default: return "";
+  }
+}
+function scanHtml(s, ks) {
+  const idx = allScans().filter(x => !x.hand).reverse().findIndex(x => x.id === s.id) + 1;
+  const title = s.hand ? "Handmatig toegevoegd" : `Foto ${idx}`;
+  const busy = ["wacht", "lezen", "nummers"].includes(s.status);
+  const sub = `${fmtTime(s.t)} · ${(s.kaarten || []).length} ${(s.kaarten || []).length === 1 ? "kaart" : "kaarten"}${isNum(s.pct) ? ` · <span class="pctt">bod ${s.pct}%</span>` : ""}${s.trend === true ? ` · <span class="pctt">trend</span>` : s.trend === false ? ` · <span class="pctt">zonder trend</span>` : ""}`;
+  let h = `<div class="scanhead"><span class="cap">${title} · ${sub}</span>${statusPill(s)}
+    <button class="iconbtn" data-act="scanmenu" data-s="${s.id}" aria-label="Opties voor ${title}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
+  if (s.err) h += `<div class="errrow"><div class="fine">${esc(s.err)}</div><button class="linkbtn" data-act="retry" data-s="${s.id}">Opnieuw</button></div>`;
+  h += ks.map(k => cardHtml(s, k)).join("");
+  if (s.status === "lezen" && !(s.kaarten || []).length) h += `<div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
+  else if (busy && s.status === "lezen") h += `<div class="skel"></div>`;
+  return h;
+}
+function cardHtml(s, k) {
+  const { card, trend, bod, src, team } = priceOf(k, s);
+  const name = card ? card.name : (k.lez.name || "Onbekende kaart") + (k.lang ? ` (${k.lang})` : "");
+  const code = card ? `<span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span>` : `<span class="code">${esc(k.lez.number || "")}</span>`;
+  const tags = [];
+  if (k.st === "check") tags.push(`<span class="warn">· Controleer</span>`);
+  if (k.st === "none") tags.push(`<span class="bad">· ${k.lang ? "Niet Engels" : "Niet gevonden"}</span>`);
+  if (isNum(k.pct)) tags.push(`<span class="pctt">· ${k.pct}%</span>`);
+  if (k.rev) tags.push(`<span class="rev">· Reverse</span>`);
+  if (card && k.st !== "none" && shortRar(card.rar || "")) tags.push(`<span>· ${esc(shortRar(card.rar))}</span>`);
+  const own = Number.isFinite(k.eigen) && k.eigen !== null;
+  const sub = src === "eigen" || src === "low" ? "prijs " + EUR.format(priceVal(k)) : src === "team" ? `${esc(memWho(team))} ${EUR.format(team.p)}` : "trend " + EUR.format(trend);
+  const price = src === "open" ? `<button class="lowpill" data-act="lowfocus" data-s="${s.id}" data-k="${k.k}" aria-label="Prijs invullen voor ${esc(name)}">Prijs</button>`
+    : bod != null ? `<b class="num">${EUR.format(bod)}</b><small class="num ${src === "team" ? "team" : src !== "trend" ? "own" : ""}">${sub}</small>` : `<b class="num">€ ?</b><small>geen prijs</small>`;
+  const open = S.open === k.k;
+  let h = `<div class="swipe" data-s="${s.id}" data-k="${k.k}"><span class="swipe-lbl">Verwijder</span><div class="card ${k.st !== "ok" ? k.st : ""} ${S.fresh.has(k.k) ? "fresh" : ""}" data-act="toggle" data-s="${s.id}" data-k="${k.k}" role="button" tabindex="0" aria-expanded="${open}">
+    ${k.thumb ? `<img class="thumb" src="${k.thumb}" alt="">` : (refImg(card) || `<span class="thumb"></span>`)}
+    <div class="info"><b>${esc(name)}</b><div class="sub">${code}${tags.join("")}</div></div>
+    <div class="price">${price}</div>`;
+  if (open) h += detailHtml(s, k, card, own);
+  return h + `</div></div>`;
+}
+function shortRar(r) {
+  const m = { "special illustration rare": "SIR", "illustration rare": "IR", "ultra rare": "Full art", "hyper rare": "Gold", "secret rare": "Secret", "shiny rare": "Shiny", "shiny ultra rare": "Shiny full art", "promo": "Promo", "black white rare": "BW rare", "mega hyper rare": "Mega gold", "mega attack rare": "Mega attack" };
+  if (!r || r.toLowerCase() === "none") return "";
+  return m[r.toLowerCase()] || r;
+}
+/* andere versies: eerst de twijfelgevallen van het lezen, dan dezelfde naam (zelfde set eerst, dan nieuwste) */
+function versionsOf(k, card) {
+  const seen = new Set(card ? [card.key] : []), out = [];
+  const push = c => { if (c && !seen.has(c.key)) { seen.add(c.key); out.push(c); } };
+  (k.alts || []).forEach(([sid, lid]) => push(CAT.byKey.get(sid + "|" + lid)));
+  if (card) (CAT.byName.get(card.nn) || []).slice().sort((a, b) => (b.sid === card.sid) - (a.sid === card.sid) || (b.set.rel || "").localeCompare(a.set.rel || "")).forEach(push);
+  return out.slice(0, 4);
+}
+function versHtml(k, card, pickAttrs, searchAttrs, showT) {
+  const vs = versionsOf(k, card);
+  const btn = a => `<button class="alt${IMG_ON && imgOf(a) ? " withimg" : ""}" ${pickAttrs} data-key="${esc(a.key)}">${refImg(a, "altimg")}<span>${esc(shortRar(a.rar || "") || "Normaal")} ${showT && trendOf(a, k.rev) ? EUR.format(trendOf(a, k.rev)) : ""}<span class="code">${esc(codeOf(a))} ${esc(numOf(a))}</span></span></button>`;
+  return `<div class="vers">${vs.length ? `<div class="alts">${vs.map(btn).join("")}</div>` : `<p class="fine">Geen andere versies met deze naam gevonden.</p>`}<button class="linkbtn" ${searchAttrs}>Zoek een andere kaart</button></div>`;
+}
+function pickVersion(sId, key, cardKey) {
+  const card = CAT.byKey.get(cardKey); if (!card) return;
+  const s = scanById(sId), k0 = s && s.kaarten.find(x => x.k === key); const hadLow = k0 && priceVal(k0) != null;
+  editCard(sId, key, k => {
+    const old = k.sid ? [k.sid, k.lid] : null; if (old && old[0] + "|" + old[1] === card.key) return;
+    k.alts = (k.alts || []).filter(x => x[0] + "|" + x[1] !== card.key); if (old) k.alts.unshift(old); k.alts = k.alts.slice(0, 8);
+    k.sid = card.sid; k.lid = card.lid; k.st = "ok"; k.low = null; k.eigen = null; k.lowT = null;
+  });
+  S.vers = null;
+  if (hadLow) toast(`${card.name} ${codeOf(card)} ${numOf(card)}, je prijs is gewist omdat die bij de vorige versie hoorde`, 4000);
+}
+function detailHtml(s, k, card, own) {
+  const pid = card && pidOf(card);
+  let h = `<div class="detail" data-stop="1">`;
+  if (card) h += `<div class="fine">${esc(card.set.name)}${shortRar(card.rar || "") ? " · " + esc(card.rar) : ""}${k.lez.sticker ? " · sticker " + esc(k.lez.sticker) : ""}${k.lez.name && norm(k.lez.name).join(" ") !== card.nn ? ` · gelezen als “${esc(k.lez.name)}”` : ""}</div>`;
+  if (IMG_ON && card && imgOf(card)) h += `<div class="cmp">${k.thumb ? `<figure><img src="${k.thumb}" alt=""><figcaption>Jouw foto</figcaption></figure>` : ""}<figure>${refImg(card, "big")}<figcaption>Scan ${esc(codeOf(card))} ${esc(numOf(card))}</figcaption></figure></div>`;
+  const tm = teamOf(k), pv = priceVal(k) ?? (tm ? tm.p : null), ids = `data-s="${s.id}" data-k="${k.k}"`;
+  h += `<div class="prices2"><div class="own"><label class="lbl" for="low-${k.k}">Prijs</label><input id="low-${k.k}" inputmode="decimal" placeholder="0,00" value="${pv != null ? moneyIn(pv) : ""}" data-act="low" ${ids} enterkeyhint="next">${tm ? `<span class="fine team">${esc(memWho(tm))}, ${esc(agoText(tm.t))}</span>` : pv != null && k.lowT ? `<span class="fine">ingevuld ${fmtTime(k.lowT)}</span>` : ""}</div>`;
+  h += `<div class="own pctown"><label class="lbl" for="pct-${k.k}">Bod %</label><input id="pct-${k.k}" inputmode="numeric" placeholder="${isNum(s.pct) ? s.pct : pct()}" value="${isNum(k.pct) ? k.pct : ""}" data-act="kpct" ${ids} enterkeyhint="done" aria-label="Bod percentage voor deze kaart">${isNum(k.pct) ? `<button class="linkbtn" data-act="clearpct" ${ids}>Wis</button>` : ""}</div>`;
+  h += `<div class="own"><span class="lbl" aria-hidden="true">&nbsp;</span><button class="nextbtn" data-act="next" ${ids} aria-label="Opslaan en volgende kaart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div></div>`;
+  const vOpen = S.vers === k.k;
+  h += `<div class="actions">
+    ${card ? `<a class="btn primary" href="${cmFor(card, !!k.rev)}" target="cardmarket">${pid ? "Cardmarket " + cmLabel(card, k.rev) : "Zoek op Cardmarket"}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
+    <button class="btn revbtn" data-act="rev" ${ids} aria-pressed="${!!k.rev}">Reverse${k.revAuto ? " herkend" : ""}</button>
+    <button class="btn vbtn" data-act="vers" ${ids} aria-pressed="${vOpen}" aria-expanded="${vOpen}">Andere versies</button>
+    <button class="btn danger" data-act="del" ${ids}>Verwijder</button></div>`;
+  if (vOpen) h += versHtml(k, card, `data-act="pick" ${ids}`, `data-act="search" ${ids}`, trendOn(s));
+  return h + `</div>`;
+}
+function drawPct() {
+  const row = $("#pctRow"), note = $("#pctNote"), tr = $("#trendRow");
+  tr.hidden = row.hidden; $("#trendSw").setAttribute("aria-checked", String(listTrend()));
+  $("#trendHint").textContent = listTrend() ? "Aan: zichtbaar en telt mee als er geen prijs is" : "Uit: bod alleen op de prijs die je invult";
+  if (row.hidden) { note.hidden = true; return; }
+  const p = pct(), ov = overrides(), opts = [40, 50, 60, 65, 70, 75, 80, 85, 90, 100], key = [p, ov.f, ov.c].join("|");
+  if (row.dataset.p === key) return; row.dataset.p = key;
+  row.innerHTML = opts.map(o => `<button class="chip num" data-pct="${o}" aria-pressed="${o === p}">${o}%</button>`).join("") +
+    `<input class="pctin num" id="pctIn" inputmode="numeric" aria-label="Eigen percentage" placeholder="anders" value="${opts.includes(p) ? "" : p}">`;
+  note.hidden = !ov.any; if (!ov.any) return;
+  const parts = [ov.f && `${ov.f} ${ov.f === 1 ? "foto" : "foto's"}`, ov.c && `${ov.c} ${ov.c === 1 ? "kaart" : "kaarten"}`].filter(Boolean);
+  note.innerHTML = `<span>${parts.join(" en ")} ${ov.f + ov.c === 1 ? "heeft" : "hebben"} een eigen %.</span><button class="linkbtn" id="pctReset" type="button">Alles op ${p}%</button>`;
+}
+
+/* ---------------------------------------------------------------- interactie */
+let pctTimer = null;
+function setPct(v) {
+  v = Math.max(1, Math.min(200, Math.round(Number(v)))); if (!Number.isFinite(v)) return;
+  const l = listOf(); if (!l) return; const nl = { ...l, pct: v };
+  const i = S.lists.findIndex(x => x.id === l.id); S.lists[i] = nl; $("#pctRow").dataset.p = ""; render();
+  clearTimeout(pctTimer); pctTimer = setTimeout(() => putList(nl).catch(() => toast("Percentage opslaan mislukt")), 500);
+}
+let swallowClick = false;
+document.addEventListener("click", e => {
+  if (swallowClick) { e.preventDefault(); e.stopPropagation(); return; }
+  if (e.target.closest("#pctReset")) { resetOverrides(); return; }
+  const pc = e.target.closest("[data-pct]"); if (pc) { setPct(pc.dataset.pct); return; }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  if (e.target.closest("[data-stop]") && a.dataset.act === "toggle") return;
+  const act = a.dataset.act, sId = a.dataset.s, key = a.dataset.k;
+  if (act === "toggle") { if (e.target.closest("a, input, button:not([data-act='toggle'])")) return; S.open = S.open === key ? null : key; S.vers = null; render(); }
+  else if (act === "pick") pickVersion(sId, key, a.dataset.key);
+  else if (act === "vers") { S.vers = S.vers === key ? null : key; render(); }
+  else if (act === "next") goNext(sId, key);
+  else if (act === "lowfocus") { S.open = key; S.vers = null; S.lastField = "low"; draw(); const i = document.getElementById("low-" + key); if (i) i.focus(); }
+  else if (act === "rev") toggleRev(sId, key);
+  else if (act === "del") deleteCard(sId, key);
+  else if (act === "buyopen") { S.openBuy = S.openBuy === a.dataset.b ? null : a.dataset.b; render(); }
+  else if (act === "buydelask") { const box = document.getElementById("bd-" + a.dataset.b); if (box) box.innerHTML = `<div class="notice">Deze inkoop verdwijnt uit je overzicht. <button class="btn danger" data-act="buydel" data-b="${a.dataset.b}">Ja, verwijder</button></div>`; }
+  else if (act === "buydel") deleteBuy(a.dataset.b);
+  else if (act === "finish") openFinish();
+  else if (act === "clearpct") editCard(sId, key, k => { k.pct = null; });
+  else if (act === "search") openSearch(sId, key);
+  else if (act === "retry") { const s = scanById(sId); if (s) retryScan(s, "quick"); }
+  else if (act === "scanmenu") openScanMenu(sId);
+});
+/* volgende kaart: prijs bewaren, volgende kaart in de lijst openen, zelfde veld klaarzetten */
+const FIELD = { low: "low", kpct: "pct" };
+function commitField(t) {
+  const s = scanById(t.dataset.s), k = s && s.kaarten.find(x => x.k === t.dataset.k); if (!k) return;
+  const act = t.dataset.act, same = (a, b) => (isNum(a) ? a : null) === b;
+  if (act === "low") {
+    const v = parseMoney(t.value), old = priceVal(k), tm = teamOf(k);
+    if (old === v || (old == null && tm && tm.p === v)) return;        // niets veranderd, of de klaarstaande teamprijs gelaten
+    editCard(s.id, k.k, k => { k.low = v; k.eigen = null; k.lowT = v != null ? Date.now() : null; });
+    rememberPrice(k, v, old);
+  }
+  else if (act === "kpct") { const v = parsePct(t.value); if (!same(k.pct, v)) editCard(s.id, k.k, k => { k.pct = v; }); }
+}
+function visibleCards() {
+  const out = []; if (S.filter === "buy") return out;
+  for (const s of allScans()) for (const k of s.kaarten || []) if (S.filter === "all" || k.st !== "ok") out.push({ s: s.id, k: k.k });
+  return out;
+}
+function goNext(sId, key) {
+  const row = document.querySelector(`.swipe[data-k="${key}"]`);
+  if (row) row.querySelectorAll(".detail input[data-act]").forEach(commitField);
+  const list = visibleCards(), i = list.findIndex(x => x.k === key), nx = i >= 0 ? list[i + 1] : null;
+  S.vers = null;
+  if (!nx) { S.open = null; draw(); toast("Dit was de laatste kaart"); return; }
+  S.open = nx.k; draw();
+  const el = document.querySelector(`.swipe[data-k="${nx.k}"]`); if (!el) return;
+  const top = $(".top"); window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - (top ? top.offsetHeight : 0) - 8) });
+  const inp = document.getElementById(`${S.lastField || "low"}-${nx.k}`) || document.getElementById(`low-${nx.k}`);
+  if (inp) inp.focus();
+}
+document.addEventListener("focusin", e => { const a = e.target.dataset && e.target.dataset.act; if (FIELD[a]) S.lastField = FIELD[a]; });
+document.addEventListener("mousedown", e => { if (e.target.closest(".nextbtn, [data-add]")) e.preventDefault(); });   // veld houdt focus, toetsenbord blijft open
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.matches("[data-act='low']")) { e.preventDefault(); goNext(e.target.dataset.s, e.target.dataset.k); return; }
+  if (e.key === "Enter" && e.target.matches("[data-act='kpct'], #spIn")) e.target.blur();
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".card[data-act='toggle']")) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.matches("[data-act='low'], [data-act='kpct']")) commitField(t);
+  else if (t.id === "pctIn" && t.value) setPct(t.value);
+  else if (t.id === "pickCamera" || t.id === "pickGallery") { addFiles(t.files); t.value = ""; }
+});
+$("#trendSw").addEventListener("click", () => setListTrend(!listTrend()));
+$("#sOpen").addEventListener("click", () => {            // alleen de kaarten zonder prijs
+  const items = [];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) if (k.sid && priceOf(k, s).src === "open") items.push({ sid: s.id, key: k.k });
+  if (!items.length) { toast("Kaarten zonder prijs zijn niet herkend, tik ze aan en kies Andere versies"); return; }
+  startLow(items);
+});
+$("#pctBtn").addEventListener("click", () => { const r = $("#pctRow"); r.hidden = !r.hidden; $("#pctBtn").setAttribute("aria-expanded", String(!r.hidden)); r.dataset.p = ""; drawPct(); });
+function setFilter(f) { S.filter = f; document.querySelectorAll("[data-filter]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.filter === f))); window.scrollTo({ top: 0 }); render(); }
+document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => setFilter(b.dataset.filter)));
+$("#buyBtn").addEventListener("click", () => openBuySheet());
+$("#searchBtn").addEventListener("click", () => openSearch(null, null));
+$("#listBtn").addEventListener("click", openLists);
+$("#lowBtn").addEventListener("click", () => openLow());
+$("#menuBtn").addEventListener("click", openMenu);
+
+/* vellen */
+function sheet(html, onClick, opts = {}) {
+  const host = $("#sheetHost"); host.innerHTML = `<div class="sheet${opts.top ? " top" : ""}${opts.cls ? " " + opts.cls : ""}" role="dialog" aria-modal="true"><div>${html}</div></div>`;
+  const el = host.firstElementChild;
+  el.addEventListener("click", e => { if (e.target === el) { if (!opts.sticky) close(); } else onClick && onClick(e, close); });
+  function close() { host.innerHTML = ""; const f = opts.onClose; opts.onClose = null; if (f) f(); }
+  return { el, close };
+}
+function openLists() {
+  const item = l => `<button class="item ${l.id === S.listId ? "on" : ""}" data-l="${l.id}"><span class="t"><b>${esc(l.naam)}</b><small>${fmtDate(new Date(l.t))} · bod ${l.pct || 70}%${l.afgerond ? " · afgerond" : ""}</small></span></button>`;
+  const own = S.lists.filter(mine), others = new Map();
+  S.lists.filter(l => !mine(l)).forEach(l => { if (!others.has(l.door)) others.set(l.door, []); others.get(l.door).push(l); });
+  const sh = sheet(`<h3>${ME.name ? "Lijsten van " + esc(ME.name) : "Lijsten"}</h3>
+    <div class="row"><input class="field" id="newName" placeholder="Naam, bijv. Beurs ${fmtDate(new Date())} Utrecht" style="flex:1;min-width:0"><button class="btn primary" data-x="new">Nieuwe lijst</button></div>
+    ${own.map(item).join("") || `<p class="fine">Nog geen eigen lijsten. Je eerste scan maakt er vanzelf een.</p>`}
+    ${listOf() ? `<div class="row"><input class="field" id="rename" value="${esc(listOf().naam)}" style="flex:1;min-width:0" aria-label="Naam van deze lijst"><button class="btn" data-x="rename">Hernoem</button></div>
+    <button class="btn danger" data-x="delask">Lijst verwijderen</button><div id="delConfirm"></div>` : ""}
+    ${[...others].map(([who, ls]) => `<div class="lbl" style="margin-top:6px">Van ${esc(who)}</div>${ls.slice(0, 6).map(item).join("")}`).join("")}
+    <div class="errrow" style="padding:6px 0 0;border:0"><span class="fine">${ME.name ? "Op deze telefoon ben je " + esc(ME.name) : "Nog niet gekozen wie je bent"}</span><button class="linkbtn" data-x="who">${ME.name ? "Wissel" : "Kies"}</button></div>`,
+    async (e, close) => {
+      const it = e.target.closest("[data-l]"); if (it) { selectList(it.dataset.l); close(); return; }
+      const x = e.target.closest("[data-x]"); if (!x) return;
+      if (x.dataset.x === "who") { openWho(); return; }
+      if (x.dataset.x === "new") { await newList($("#newName").value.trim() || undefined); close(); }
+      else if (x.dataset.x === "rename") { const l = listOf(); const v = $("#rename").value.trim(); if (l && v) await putList({ ...l, naam: v }); close(); render(); }
+      else if (x.dataset.x === "delask") $("#delConfirm").innerHTML = `<div class="notice">Alle scans in deze lijst verdwijnen. <button class="btn danger" data-x="del">Ja, verwijder</button></div>`;
+      else if (x.dataset.x === "del") { await deleteList(); close(); }
+    });
+}
+async function deleteList() {
+  const l = listOf(); if (!l) return;
+  for (const s of allScans()) await deleteScanDoc(s).catch(() => {});
+  if (S.db) await S.db.doc("lijsten/" + l.id).delete().catch(() => {});
+  S.lists = S.lists.filter(x => x.id !== l.id); saveLocal();
+  clearSelection(); const next = pickDefaultList(); if (next) selectList(next.id); else render();
+  toast("Lijst verwijderd");
+}
+const MI = {
+  tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  bag: '<path d="M5 8h14l-1.2 12H6.2L5 8Z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+  sheet: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  lists: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  down: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>',
+};
+const mIcon = (k, c) => `<span class="mi ${c}" aria-hidden="true"><svg viewBox="0 0 24 24">${MI[k]}</svg></span>`;
+const mTile = (m, icon, color, title, sub, extra = "") => `<button class="mtile${extra}" data-m="${m}">${mIcon(icon, color)}<b>${title}</b><small>${sub}</small></button>`;
+function openMenu() {
+  const scans = allScans(), n = scans.reduce((a, x) => a + (x.kaarten || []).length, 0);
+  sheet(`<h3>${esc(listOf() ? listOf().naam : "Kaartscan")}</h3>
+    <div class="mgroup"><div class="lbl">Prijzen</div><div class="mgrid">
+      ${mTile("low", "tag", "blue", "Prijzen checken", "Alle kaarten langs op Cardmarket")}
+      ${mTile("add", "search", "blue", "Zoek een kaart", listTrend() ? "Trend en Cardmarket, of toevoegen" : "Cardmarket, of toevoegen")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Inkoop</div><div class="mgrid">
+      ${mTile("buy", "bag", "green", "Inkoop opslaan", "Kaarten in je lijst als inkoop")}
+      ${mTile("finish", "flag", "green", "Dag afronden", "Inkopen van vandaag naar je sheet")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Versturen</div><div class="mgrid">
+      ${mTile("sheet", "sheet", "amber", "Lijst naar Sheet", "Wat nu in je lijst staat")}
+      ${mTile("copy", "copy", "amber", "Kopieer lijst", "Als tabel om te plakken")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Lijst</div><div class="mgrid">
+      ${mTile("lists", "lists", "grey", "Lijsten", "Wisselen, nieuw, hernoemen")}
+      <button class="mtile danger" data-m="clear"${scans.length ? "" : " disabled"}>${mIcon("trash", "red")}<b>Lijst leegmaken</b><small>${scans.length ? `${n} ${n === 1 ? "kaart" : "kaarten"} verwijderen` : "Lijst is al leeg"}</small></button>
+      ${STANDALONE ? `<button class="mtile wide" data-m="import">${mIcon("down", "grey")}<span class="mt"><b>Lijsten uit Claude importeren</b><small>Eenmalig, je lijsten en inkopen uit de Claude versie</small></span></button>` : ""}
+    </div></div>
+    <p class="fine">Je bod rekent met de prijs die je per kaart invult. Trend staat standaard uit. Zet hem aan via Bod ▾ bovenin, of per foto via ⋯, dan telt de Cardmarket trend ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) + " " : ""}mee als er geen prijs is.</p>`,
+    (e, close) => {
+      const m = e.target.closest("[data-m]"); if (!m || m.disabled) return; close();
+      const go = { sheet: toSheet, buy: openBuySheet, finish: openFinish, low: openLow, copy: copyList, add: () => openSearch(null, null), import: importSeed, clear: openClear, lists: openLists }[m.dataset.m];
+      if (go) go();
+    });
+}
+/* lijst leegmaken: alle foto's en kaarten weg, de lijst zelf en opgeslagen inkopen blijven */
+function openClear() {
+  const l = listOf(), scans = allScans(); if (!scans.length) { toast("Deze lijst is al leeg"); return; }
+  const n = scans.reduce((a, x) => a + (x.kaarten || []).length, 0), f = scans.filter(x => !x.hand).length, who = ownerOf(l);
+  sheet(`<div class="warnhead">${mIcon("trash", "red")}<h3>Lijst leegmaken?</h3></div>
+    <p style="margin:0">Alle ${n} ${n === 1 ? "kaart" : "kaarten"}${f ? ` en ${f} ${f === 1 ? "foto" : "foto's"}` : ""} in <b>${esc(l ? l.naam : "deze lijst")}</b> worden verwijderd. Dit kun je niet terugdraaien.</p>
+    ${who ? `<div class="notice" style="color:var(--bad)"><b style="color:inherit">Let op: dit is een lijst van ${esc(who)}.</b></div>` : ""}
+    <p class="fine" style="margin:0">De lijst zelf, met naam en bod, blijft staan. Opgeslagen inkopen blijven ook bewaard.</p>
+    <div class="confirm"><button class="btn" data-c="no">Annuleer</button><button class="btn danger solid" data-c="yes">Ja, alles verwijderen</button></div>`,
+    async (e, close) => { const b = e.target.closest("[data-c]"); if (!b) return; close(); if (b.dataset.c === "yes") await clearList(); });
+}
+async function clearList() {
+  const scans = allScans(); if (!scans.length) return;
+  S.open = null; S.vers = null;
+  for (const x of scans) { S.gone.add(x.id); S.bitmaps.delete(x.id); }
+  S.queue = S.queue.filter(j => !S.gone.has(j.id)); render();
+  let fail = 0;
+  for (let i = 0; i < scans.length; i += 8) await Promise.all(scans.slice(i, i + 8).map(x => deleteScanDoc(x).catch(() => { fail++; S.gone.delete(x.id); })));
+  saveLocal(); render();
+  toast(fail ? `Lijst leeggemaakt, ${fail} ${fail === 1 ? "foto kon" : "foto's konden"} niet weg. Probeer het nog een keer.` : "Lijst leeggemaakt");
+}
+function openScanMenu(sId) {
+  const s = scanById(sId); if (!s) return; const hasBm = S.bitmaps.has(sId);
+  const cur = isNum(s.pct) ? s.pct : null, def = pct(), opts = [50, 60, 65, 70, 75, 80, 85, 90].filter(o => o !== def);
+  const sh = sheet(`<h3>${s.hand ? "Handmatig toegevoegd" : "Foto " + fmtTime(s.t)}</h3>
+    <div class="lbl">Bod voor deze foto</div>
+    <div class="chips"><button class="chip" data-sp="" aria-pressed="${cur == null}">Lijst ${def}%</button>${opts.map(o => `<button class="chip num" data-sp="${o}" aria-pressed="${cur === o}">${o}%</button>`).join("")}<input class="pctin num" id="spIn" inputmode="numeric" enterkeyhint="done" placeholder="anders" aria-label="Eigen percentage voor deze foto" value="${cur != null && !opts.includes(cur) ? cur : ""}"></div>
+    <p class="fine" style="margin:-4px 0 4px">Voor één kaart: tik de kaart aan en vul Bod % in.</p>
+    <div class="setrow"><span class="t"><b>Trend voor deze foto</b><small>Handig voor een pagina vol goedkope kaarten</small></span><button class="switch" data-strend="1" type="button" role="switch" aria-checked="${trendOn(s)}" aria-label="Trend voor deze foto"><i></i></button></div>
+    ${hasBm ? `<button class="item" data-m="acc"><span class="t"><b>Opnieuw lezen, nauwkeurig</b><small>Langzamer, beter bij twijfel of slechte foto</small></span></button>
+    <button class="item" data-m="again"><span class="t"><b>Opnieuw lezen</b><small>Snel</small></span></button>` : ""}
+    <button class="item" data-m="del"><span class="t"><b>Verwijder deze foto</b><small>Met alle ${(s.kaarten || []).length} kaarten</small></span></button>`,
+    async (e, close) => {
+      const sp = e.target.closest("[data-sp]"); if (sp) { close(); setScanPct(sId, sp.dataset.sp === "" ? null : Number(sp.dataset.sp)); return; }
+      if (e.target.closest("[data-strend]")) { close(); setScanTrend(sId); return; }
+      const m = e.target.closest("[data-m]"); if (!m) return; close();
+      if (m.dataset.m === "acc") retryScan(s, "default"); else if (m.dataset.m === "again") retryScan(s, "quick");
+      else { await deleteScanDoc(s).catch(() => toast("Verwijderen mislukt")); render(); }
+    });
+  sh.el.addEventListener("change", e => { if (e.target.id !== "spIn") return; const v = parsePct(e.target.value); if (v == null) return; sh.close(); setScanPct(sId, v); });
+}
+/* setcode en nummer aan elkaar ('AQ41', 'evo101') zoeken als 'AQ 41'. Waar de letters ook een nummer-voorvoegsel kunnen zijn
+   (SV41, XY35), komen beide uitleggingen mee, de nummer-uitleg eerst */
+let CODESET = null, LIDPRE = null;
+function splitQuery(q) {
+  if (!CODESET) {
+    CODESET = new Set(CAT.sets.map(st => (st.code || "").toLowerCase()).filter(Boolean));
+    LIDPRE = new Set(CAT.cards.map(c => (/^([A-Za-z]+)\d/.exec(c.lid) || [])[1]).filter(Boolean).map(x => x.toLowerCase()));
+  }
+  let changed = false, clash = false;
+  const out = String(q || "").replace(/\b([A-Za-z]{2,4})(\d{1,3}[A-Za-z]?)\b/g, (m, a, n) => {
+    const k = a.toLowerCase(); if (!CODESET.has(k)) return m;
+    changed = true; if (LIDPRE.has(k)) clash = true; return a + " " + n;
+  });
+  return { q: out, changed, clash };
+}
+function searchCards(q) {
+  // 'mega charizard ex' vindt ook de XY kaarten, die heten 'M Charizard EX'
+  const mm = /^\s*mega\s+(.+)$/i.exec(String(q || ""));
+  if (!mm) return searchOne(q);
+  const a = searchOne(q), b = searchOne("M " + mm[1]), seen = new Set(), out = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) for (const c of [a[i], b[i]]) if (c && !seen.has(c.key)) { seen.add(c.key); out.push(c); }
+  return out.slice(0, 50);
+}
+function searchOne(q) {
+  const sp = splitQuery(q);
+  const pass = fz => {
+    if (!sp.changed) return searchPass(q, fz);
+    const a = searchPass(sp.q, fz), b = searchPass(q, fz), seen = new Set(), out = [];
+    for (const c of sp.clash ? [...b, ...a] : [...a, ...b]) if (!seen.has(c.key)) { seen.add(c.key); out.push(c); }
+    return out.slice(0, 50);
+  };
+  const r = pass(false); return r.length ? r : pass(true);
+}
+function wordHit(t, w, fuzzy) {
+  if (t.startsWith(w)) return true;
+  if (w.length > 3 && w.endsWith("s") && t.startsWith(w.slice(0, -1))) return true;     // lillies, rockets
+  return fuzzy && w.length >= 4 && sim(t.slice(0, Math.max(w.length, t.length)), w) >= 0.75;
+}
+function searchPass(q, fuzzy) {
+  let raw = String(q || "").toUpperCase(), total = null, level = 0;
+  const lq = /\bLV\.?\s*(\d{1,3})\b/.exec(raw); if (lq) { level = Number(lq[1]); raw = raw.replace(lq[0], " "); }   // 'garchomp lv 57
+  const m = /([A-Z]*\d+[A-Z]?)\s*\/\s*([A-Z]*\d+)/.exec(raw); if (m && /^\d+$/.test(m[2])) total = parseInt(m[2], 10);
+  const tok = norm(m ? raw.replace(m[0], " " + m[1] + " ") : raw); if (!tok.length) return [];
+  const nums = tok.filter(t => /\d/.test(t) && !CAT.sets.some(st => (st.code || "").toLowerCase() === t)), words = tok.filter(t => !nums.includes(t));
+  const res = [];
+  for (const c of CAT.cards) {
+    const nt = c.nn.split(" "), code = (c.set.code || "").toLowerCase(), sname = c.set.name.toLowerCase();
+    let viaName = 0, viaCode = 0, ok = true;
+    for (const w of words) {
+      if (nt.some(t => wordHit(t, w, fuzzy))) viaName++;
+      else if (code === w) viaCode++;                                    // exacte setcode weegt zwaarder dan een stukje setnaam
+      else if (sname.split(/\s+/).some(t => t.startsWith(w))) continue;
+      else { ok = false; break; }
+    }
+    if (!ok) continue;
+    // '18' vindt ook DP18 en TG18 (promo nummers met letters ervoor), een exact nummer telt zwaarder
+    const exactNum = nums.some(n => parseNumber(n).lid === parseNumber(c.lid).lid);
+    if (nums.length && !exactNum && !nums.some(n => { const a = parseNumber(n).lid; return /^\d+[A-Z]?$/.test(a) && parseNumber(c.lid).lid.replace(/^[A-Z]+/, "") === a; })) continue;
+    if (total && c.set.total !== total) continue;
+    if (level && c.lv !== level) continue;
+    if (!words.length && !nums.length && !level) continue;
+    const nameWords = words.filter(w => nt.some(t => wordHit(t, w, fuzzy))).join(" ");
+    const score = (nameWords && c.nn === nameWords ? 6 : 0) + (words[0] && c.nn.startsWith(words[0]) ? 3 : 0) + viaName + 5 * viaCode + (nums.length ? (exactNum ? 2 : 1) : 0) + (nameWords ? 4 * sim(c.nn, nameWords) : 0);
+    res.push([score, c]);
+  }
+  return res.sort((a, b) => b[0] - a[0] || (b[1].set.rel || "").localeCompare(a[1].set.rel || "")).slice(0, 50).map(x => x[1]);
+}
+// zonder Cardmarket nummer: zoeken op naam zoals Cardmarket hem schrijft (M Charizard EX heet daar MCharizard EX)
+const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1").replace(/\s*[☆★]/, " Gold Star");   // Espeon ☆ heet daar Espeon Gold Star
+function cmFor(card, rev) { const pid = pidOf(card); return pid ? cmLink(pid, card, rev) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`; }
+function openSearch(sId, key, opts = {}) {
+  const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
+  const start = k0 ? k0.lez.name : (S.lastQ || ""), showT = s0 ? trendOn(s0) : listTrend();
+  const sh = sheet(`<h3>${k0 ? "Kies de juiste kaart" : "Zoek een kaart"}</h3>
+    <div class="qwrap"><input class="field" id="q" type="search" placeholder="Naam, nummer of set, bijv. mew ex 205 of pfl 125" value="${esc(start)}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"><button class="qclear" id="qClear" type="button" aria-label="Zoekbalk leegmaken"${start ? "" : " hidden"}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div id="res" style="display:grid;gap:8px"></div>`,
+    async (e, close) => {
+      const add = e.target.closest("[data-add]");
+      if (add) {                                                        // toevoegen en meteen klaar voor de volgende zoekopdracht
+        const card = CAT.byKey.get(add.dataset.add); q.value = ""; S.lastQ = ""; $("#qClear", sh.el).hidden = true; run(); q.focus();
+        await addManual(card); toast(`${card.name} toegevoegd aan je lijst`); return;
+      }
+      const it = e.target.closest("[data-key]"); if (!it || !k0) return;
+      pickVersion(sId, key, it.dataset.key); close();
+    }, { top: true, onClose: opts.onClose });
+  const q = $("#q", sh.el), res = $("#res", sh.el); let timer = null;
+  const row = c => {
+    const t = trendOf(c, false), r = trendOf(c, true);
+    const info = `${IMG_ON ? (refImg(c, "sthumb") || `<span class="sthumb"></span>`) : ""}<span class="t"><b>${esc(c.name)}${c.lv ? ` <small class="lvl">Lv.${c.lv}</small>` : ""}</b><small><span class="code">${esc(codeOf(c))} ${esc(numOf(c))}</span>${shortRar(c.rar || "") ? " · " + esc(shortRar(c.rar)) : ""} · ${esc(c.set.name)}</small></span>
+      <span class="sp num">${showT ? `<b>${t ? EUR.format(t) : "€ ?"}</b>${r ? `<small>rev ${EUR.format(r)}</small>` : ""}` : ""}</span>`;
+    if (k0) return `<button class="item srow pick" data-key="${esc(c.key)}">${info}</button>`;
+    return `<div class="item srow">${info}
+      <a class="iconbtn sbtn" href="${cmFor(c)}" target="cardmarket" aria-label="Open ${esc(c.name)} op Cardmarket"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+      <button class="iconbtn sbtn add" data-add="${esc(c.key)}" aria-label="Voeg ${esc(c.name)} toe aan je lijst"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>`;
+  };
+  const run = () => {
+    if (!k0) S.lastQ = q.value;
+    const list = searchCards(q.value);
+    res.innerHTML = list.map(row).join("") || `<p class="fine">${q.value.trim() ? "Niets gevonden. Probeer alleen de naam, of naam en nummer." : "Typ een naam, eventueel met nummer of setcode."}</p>`;
+  };
+  const clr = $("#qClear", sh.el);
+  q.addEventListener("input", () => { clr.hidden = !q.value; clearTimeout(timer); timer = setTimeout(run, 90); });
+  clr.addEventListener("mousedown", e => e.preventDefault());                 // zoekbalk houdt focus, toetsenbord blijft open
+  clr.addEventListener("click", () => { q.value = ""; clr.hidden = true; if (!k0) S.lastQ = ""; run(); q.focus(); });
+  // meteen focussen, nog binnen de tik: alleen dan opent iPhone het toetsenbord. Cursor achter de naam, niets geselecteerd.
+  q.focus(); const L = q.value.length; try { q.setSelectionRange(L, L); } catch {}
+  run();
+}
+async function addManual(card) {
+  const list = await ensureList();
+  let s = allScans().find(x => x.hand);
+  const k = { k: uid(), box: null, lez: { name: card.name, number: card.lid }, st: "ok", sid: card.sid, lid: card.lid, alts: [], rev: false, eigen: null, thumb: null };
+  if (s) { s = { ...s, kaarten: [k, ...s.kaarten], n: s.kaarten.length + 1, t: Date.now(), _v: (s._v || 0) + 1 }; }
+  else s = { id: uid(), list: list.id, t: Date.now(), status: "klaar", hand: true, kaarten: [k], foto: null, n: 1, _v: 1 };
+  S.fresh.add(k.k); S.scans.set(s.id, s); render();
+  try { await putScan(s); } catch { toast("Opslaan mislukt"); }
+}
+
+/* prijzen checken: alle kaarten één voor één langs, zelf opzoeken op Cardmarket, de app zet ze klaar */
+const LOW = { run: null };
+function lowCandidates() {
+  const out = [];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
+    if (s.trend === true) continue;                          // foto bewust op trend gezet
+    if (k.sid && CAT.byKey.get(k.sid + "|" + k.lid)) out.push({ sid: s.id, key: k.k });
+  }
+  return out;
+}
+function startLow(items) {
+  if (!items.length) { toast(allScans().length ? "Geen herkende kaarten om te checken" : "Scan eerst een paar kaarten"); return; }
+  LOW.vers = false; LOW.run = { items, i: 0, filled: 0, skipped: 0 }; drawLow(lowSheet().el);
+}
+function openLow() { startLow(lowCandidates()); }
+const lowSheet = () => sheet(`<div class="lowsheet" id="lowBody"></div>`, (e, close) => lowClick(e, close), { top: true, sticky: true, cls: "low" });
+function resumeLow() { if (!LOW.run) return; drawLow(lowSheet().el); }
+function lowItem() { const r = LOW.run; if (!r) return null; const it = r.items[r.i]; if (!it) return null; const s = scanById(it.sid); const k = s && s.kaarten.find(x => x.k === it.key); return k ? { s, k } : null; }
+function drawLow(el) {
+  const body = $("#lowBody", el); if (!body) return;
+  const r = LOW.run; if (!r) return;
+  const cur = lowItem();
+  if (!cur) {
+    body.innerHTML = `<div style="display:grid;gap:14px"><h3>Klaar</h3><p>${r.filled} ${r.filled === 1 ? "prijs" : "prijzen"} ingevuld, ${r.skipped} overgeslagen.</p><button class="btn primary wide" data-low="close">Terug naar de lijst</button></div>`;
+    return;
+  }
+  const { s, k } = cur; const card = CAT.byKey.get(k.sid + "|" + k.lid); const pid = pidOf(card); const t = trendOf(card, k.rev);
+  const link = cmFor(card, !!k.rev);
+  const tm = teamOf(k), pre = priceVal(k) ?? (tm ? tm.p : null);
+  const preTxt = tm ? memText(tm) : priceVal(k) != null ? `Al ingevuld${k.lowT ? " om " + fmtTime(k.lowT) : ""}` : "";
+  const pctDone = Math.round(r.i / r.items.length * 100);
+  body.innerHTML = `<div style="display:grid;gap:16px">
+    <div class="lowhead"><b class="num">${r.i + 1} / ${r.items.length}</b><span class="prog"><i style="width:${pctDone}%"></i></span><button class="linkbtn" data-low="close">Stop</button></div>
+    <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : (refImg(card, "ph") || `<span class="ph"></span>`)}
+      <div><b>${esc(card.name)}${k.rev ? " (reverse)" : ""}</b><span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span> <span class="tag">${esc(shortRar(card.rar || ""))}</span>
+      <div class="fine">${esc(card.set.name)}</div><div class="fine num">${trendOn(s) ? `Trend ${t ? EUR.format(t) : "onbekend"}` : ""}</div>
+      <div class="lowtools"><button class="linkbtn vlink" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button>${canRev(card) || k.rev ? `<button class="btn revbtn" data-low="rev" aria-pressed="${!!k.rev}">Reverse${k.revAuto ? " herkend" : ""}</button>` : ""}</div></div></div>
+    ${LOW.vers ? versHtml(k, card, `data-low="pick"`, `data-low="search"`, trendOn(s)) : ""}
+    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">${pid ? "Open Cardmarket " + cmLabel(card, k.rev) : "Zoek op Cardmarket"}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+    <label class="lbl" for="lowIn">Prijs (laagste ${cmLabel(card, k.rev)})</label>
+    <input class="bigin" id="lowIn" inputmode="decimal" enterkeyhint="next" placeholder="0,00" autocomplete="off" value="${pre != null ? moneyIn(pre) : ""}">
+    ${preTxt ? `<div class="fine team" style="margin-top:-10px">${esc(preTxt)}</div>` : ""}
+    <button class="btn primary wide" data-low="save">Opslaan en volgende</button>
+    <div class="actions" style="justify-content:space-between"><button class="btn" data-low="prev" ${r.i ? "" : "disabled"}>Vorige</button><button class="btn" data-low="skip">Overslaan</button></div>
+  </div>`;
+}
+async function lowClick(e, close) {
+  const el = $(".sheet");
+  const b = e.target.closest("[data-low]"); if (!b) return;
+  const a = b.dataset.low, r = LOW.run;
+  if (a === "close") { LOW.run = null; close(); render(); return; }
+  if (a === "opened") { if (r) r.opened = true; return; }
+  if (!r) return;
+  if (a === "vers") { LOW.vers = !LOW.vers; drawLow(el); return; }
+  if (a === "rev") { const cur = lowItem(); if (cur) toggleRev(cur.s.id, cur.k.k); drawLow(el); return; }
+  if (a === "pick") { const cur = lowItem(); if (cur) pickVersion(cur.s.id, cur.k.k, b.dataset.key); LOW.vers = false; drawLow(el); return; }
+  if (a === "search") { const cur = lowItem(); if (cur) { LOW.vers = false; openSearch(cur.s.id, cur.k.k, { onClose: resumeLow }); } return; }
+  LOW.vers = false;
+  if (a === "save") {
+    const v = parseMoney($("#lowIn").value);
+    if (v == null) { toast("Vul eerst een prijs in, of tik op Overslaan"); $("#lowIn").focus(); return; }
+    const cur = lowItem();
+    if (cur) {
+      const old = priceVal(cur.k), tm = teamOf(cur.k);
+      if (old !== v && !(old == null && tm && tm.p === v)) { editCard(cur.s.id, cur.k.k, k => { k.low = v; k.eigen = null; k.lowT = Date.now(); }); rememberPrice(cur.k, v, old); }
+    }
+    r.filled++; r.i++; drawLow(el); return;
+  }
+  if (a === "skip") { r.skipped++; r.i++; drawLow(el); return; }
+  if (a === "prev") { r.i = Math.max(0, r.i - 1); drawLow(el); return; }
+}
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "lowIn") { e.preventDefault(); const b = $("[data-low='save']"); if (b) b.click(); } });
+const refocusLow = () => { if (document.visibilityState === "visible" && LOW.run) { const i = $("#lowIn"); if (i && document.activeElement !== i) setTimeout(() => { i.focus(); if (i.value) i.select(); }, 120); } };
+document.addEventListener("visibilitychange", refocusLow); window.addEventListener("focus", refocusLow);
+
+/* inkopen */
+const listBuys = () => S.buys.filter(b => !b.list || b.list === S.listId).sort((a, b) => b.t - a.t);
+function busyScans() { return allScans().some(s => ["wacht", "lezen", "nummers"].includes(s.status)); }
+function activeCards() {
+  const out = [];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
+    const p = priceOf(k, s);
+    out.push({ pct: p.pct, naam: p.card ? p.card.name : (k.lez.name || "Onbekende kaart"), set: p.card ? p.card.set.name : "", code: p.card ? codeOf(p.card) : "",
+      nr: p.card ? numOf(p.card, k.lez.number) : (k.lez.number || ""), pid: p.card ? pidOf(p.card) : null, rev: !!k.rev, sid: k.sid || null, lid: k.lid || null,
+      trend: p.trend ?? null, low: Number.isFinite(k.low) ? k.low : p.team ? p.team.p : null, team: p.team ? memWho(p.team) : null, eigen: Number.isFinite(k.eigen) ? k.eigen : null,
+      basis: p.base ?? null, bod: p.bod ?? null, thumb: k.thumb || null });
+  }
+  return out;
+}
+function allocate(cards, paid) {        // betaald bedrag naar rato van de waarde per kaart, voor je administratie
+  const known = cards.map(c => c.basis).filter(v => v > 0); const avg = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+  const w = cards.map(c => c.basis > 0 ? c.basis : avg); const sum = w.reduce((a, b) => a + b, 0) || 1;
+  let total = 0; cards.forEach((c, i) => { c.inkoop = round2(paid * w[i] / sum); total += c.inkoop; });
+  const diff = round2(paid - total); if (diff && cards.length) { let mi = 0; w.forEach((x, i) => { if (x > w[mi]) mi = i; }); cards[mi].inkoop = round2(cards[mi].inkoop + diff); }
+}
+async function putBuy(b) {
+  const body = stripId(b);
+  if (JSON.stringify(body).length > 200000) body.kaarten = body.kaarten.map(c => ({ ...c, thumb: null }));
+  if (S.db) await serial(`lijsten/${b.list}/inkopen/${b.id}`, () => S.db.doc(`lijsten/${b.list}/inkopen/${b.id}`).set(body));
+  else { S.buys = S.buys.filter(x => x.id !== b.id).concat([b]); saveLocal(); }
+}
+async function deleteBuy(id) {
+  const b = S.buys.find(x => x.id === id); if (!b) return;
+  if (S.db) await serial(`lijsten/${b.list}/inkopen/${id}`, () => S.db.doc(`lijsten/${b.list}/inkopen/${id}`).delete()).catch(() => toast("Verwijderen mislukt"));
+  S.buys = S.buys.filter(x => x.id !== id); saveLocal(); S.openBuy = null; render(); toast(`Inkoop ${b.nr} verwijderd`);
+}
+function openBuySheet() {
+  const cards = activeCards(); if (!cards.length) { toast("Er staan geen kaarten in je lijst"); return; }
+  if (busyScans()) { toast("Wacht tot alle foto's gelezen zijn"); return; }
+  const tr = cards.reduce((a, c) => a + (c.trend || 0), 0), bod = round2(cards.reduce((a, c) => a + (c.bod || 0), 0)), noPrice = cards.filter(c => c.basis == null).length;
+  let via = (() => { try { return localStorage.getItem("kaartscan.via") || ""; } catch { return ""; } })();
+  sheet(`<h3>Inkoop opslaan</h3>
+    <div class="sumgrid"><div><small>Kaarten</small><b class="num">${cards.length}</b></div>${listTrend() ? `<div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div>` : `<div><small>Zonder prijs</small><b class="num"${noPrice ? ' style="color:var(--warn)"' : ""}>${noPrice}</b></div>`}<div><small>${overrides().any ? "Bod" : `Bod ${pct()}%`}</small><b class="num">${EUR.format(bod)}</b></div></div>
+    ${noPrice ? `<p class="fine" style="margin:0">${noPrice} ${noPrice === 1 ? "kaart heeft" : "kaarten hebben"} nog geen prijs en ${noPrice === 1 ? "telt" : "tellen"} als € 0 in je bod.</p>` : ""}
+    <label class="lbl" for="buyPaid">Betaald</label>
+    <input class="bigin" id="buyPaid" inputmode="decimal" value="${String(bod.toFixed(2)).replace(".", ",")}" autocomplete="off">
+    <label class="lbl" for="buySeller">Verkoper, optioneel</label>
+    <input class="field" id="buySeller" placeholder="Naam of standnummer" autocomplete="off">
+    <div class="lbl">Betaald via</div>
+    <div class="chips" id="viaChips">${["Contant", "Tikkie", "Pin", "Ruil"].map(v => `<button class="chip" data-via="${v}" aria-pressed="${v === via}">${v}</button>`).join("")}</div>
+    <button class="btn primary wide" data-b="save">Inkoop opslaan</button>
+    <button class="btn wide" data-b="clearask">Lijst leegmaken zonder inkoop</button><div id="clearConfirm"></div>`,
+    async (e, close) => {
+      const v = e.target.closest("[data-via]");
+      if (v) { via = via === v.dataset.via ? "" : v.dataset.via; document.querySelectorAll("[data-via]").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.via === via))); try { localStorage.setItem("kaartscan.via", via); } catch {} return; }
+      const b = e.target.closest("[data-b]"); if (!b) return;
+      if (b.dataset.b === "save") {
+        const paid = parseMoney($("#buyPaid").value); if (paid == null) { toast("Vul het betaalde bedrag in"); return; }
+        b.disabled = true; await saveBuy(paid, $("#buySeller").value.trim(), via); close();
+      } else if (b.dataset.b === "clearask") $("#clearConfirm").innerHTML = `<div class="notice">Alle kaarten in je lijst verdwijnen, zonder inkoop. <button class="btn danger" data-b="clear">Ja, leegmaken</button></div>`;
+      else if (b.dataset.b === "clear") { close(); await clearActive(); toast("Lijst leeggemaakt"); }
+    });
+}
+async function clearActive() { for (const s of allScans()) await deleteScanDoc(s).catch(() => {}); S.open = null; render(); }
+async function saveBuy(paid, seller, via) {
+  const list = await ensureList(); const cards = activeCards(); allocate(cards, paid);
+  const nr = Math.max(0, ...listBuys().map(b => b.nr || 0)) + 1;
+  const b = { id: uid(), list: list.id, t: Date.now(), nr, verkoper: seller || "", via: via || "", betaald: paid, pct: pct(), n: cards.length,
+    trend: round2(cards.reduce((a, c) => a + (c.trend || 0), 0)), basis: round2(cards.reduce((a, c) => a + (c.basis || 0), 0)), kaarten: cards };
+  try { await putBuy(b); } catch { toast("Inkoop opslaan mislukt, je lijst is niet aangepast", 5000); return; }
+  if (S.db) S.buys = [b, ...S.buys.filter(x => x.id !== b.id)];
+  await clearActive();
+  toast(`Inkoop ${nr} opgeslagen, ${EUR.format(paid)} voor ${cards.length} ${cards.length === 1 ? "kaart" : "kaarten"}`, 4500);
+}
+function buysHtml() {
+  const buys = listBuys(); const list = listOf();
+  if (!buys.length) return `<div class="empty"><h2>Nog geen inkopen</h2><p>Scan de kaarten, veeg weg wat je niet koopt en tik onderin op Inkoop. Hier zie je daarna al je inkopen van de dag.</p></div>`;
+  const paid = buys.reduce((a, b) => a + (b.betaald || 0), 0), n = buys.reduce((a, b) => a + (b.n || 0), 0), tr = buys.reduce((a, b) => a + (b.trend || 0), 0);
+  let h = `<section class="scan daycard"><div><small class="lbl">Uitgegeven</small><div class="big num">${EUR.format(paid)}</div></div>
+    <div class="sumgrid"><div><small>Inkopen</small><b class="num">${buys.length}</b></div><div><small>Kaarten</small><b class="num">${n}</b></div>${listTrend() ? `<div><small>Trend</small><b class="num">${EUR.format(tr)}</b></div>` : `<div><small>Per kaart</small><b class="num">${EUR.format(n ? paid / n : 0)}</b></div>`}</div>
+    <button class="btn primary wide" data-act="finish">Dag afronden en naar Sheet</button>
+    ${list && list.afgerond ? `<p class="fine">Afgerond om ${fmtTime(list.afgerond)} en naar je sheet gestuurd. Komen er nog inkopen bij, rond dan opnieuw af.</p>` : ""}</section>`;
+  for (const b of buys) {
+    const open = S.openBuy === b.id;
+    h += `<section class="scan"><div class="scanhead buyhead" data-act="buyopen" data-b="${b.id}" role="button" tabindex="0" aria-expanded="${open}">
+      <div class="t"><b>Inkoop ${b.nr}${b.verkoper ? " · " + esc(b.verkoper) : ""}</b><small>${fmtTime(b.t)} · ${b.n} ${b.n === 1 ? "kaart" : "kaarten"}${b.via ? " · " + esc(b.via) : ""}</small></div>
+      <div class="price"><b class="num">${EUR.format(b.betaald || 0)}</b>${listTrend() ? `<small class="num">trend ${EUR.format(b.trend || 0)}</small>` : ""}</div></div>`;
+    if (open) {
+      h += (b.kaarten || []).map(c => `<div class="buyrow">${c.thumb ? `<img src="${c.thumb}" alt="">` : (c.sid ? refImg(CAT.byKey.get(c.sid + "|" + c.lid), "ph") : "") || `<span class="ph"></span>`}
+        <div style="min-width:0"><b>${esc(c.naam)}${c.rev ? " (reverse)" : ""}</b><small><span class="code">${esc(c.code)} ${esc(c.nr)}</span>${isNum(c.eigen) || isNum(c.low) ? " · prijs " + EUR.format(isNum(c.eigen) ? c.eigen : c.low) : listTrend() && c.trend ? " · trend " + EUR.format(c.trend) : ""}</small></div>
+        <div class="price"><b class="num">${EUR.format(c.inkoop || 0)}</b><small>inkoop</small></div></div>`).join("");
+      h += `<div class="errrow"><span class="fine">Inkoop per kaart is het betaalde bedrag verdeeld naar waarde.</span><button class="linkbtn" style="color:var(--bad)" data-act="buydelask" data-b="${b.id}">Verwijder</button></div><div id="bd-${b.id}" style="padding:0 12px 12px"></div>`;
+    }
+    h += `</section>`;
+  }
+  return h;
+}
+function dayRows() {
+  const buys = listBuys().slice().reverse();
+  const out = [["Inkoop", "Tijd", "Verkoper", "Betaald via", "Naam", "Set", "Nummer", "Trend", "Prijs", "Inkoopprijs", "Cardmarket (NL, NM)"]];
+  for (const b of buys) for (const c of b.kaarten || [])
+    out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", c.naam + (c.rev ? " (reverse)" : ""), c.set ? `${c.set} (${c.code})` : "", c.nr ? "'" + c.nr : "",
+      c.trend ?? "", isNum(c.eigen) ? c.eigen : (c.low ?? ""), c.inkoop ?? "", c.pid ? cmLink(c.pid, c.sid ? CAT.byKey.get(c.sid + "|" + c.lid) : null, !!c.rev) : ""]);
+  out.push([]);
+  out.push(["Inkoop", "Tijd", "Verkoper", "Betaald via", "Kaarten", "Trend totaal", "Betaald"]);
+  for (const b of buys) out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", b.n, b.trend || 0, b.betaald || 0]);
+  out.push(["Totaal", "", "", "", buys.reduce((a, b) => a + (b.n || 0), 0), round2(buys.reduce((a, b) => a + (b.trend || 0), 0)), round2(buys.reduce((a, b) => a + (b.betaald || 0), 0))]);
+  return out;
+}
+function openFinish() {
+  const buys = listBuys(); if (!buys.length) { toast("Nog geen inkopen om af te ronden"); return; }
+  const paid = buys.reduce((a, b) => a + (b.betaald || 0), 0), n = buys.reduce((a, b) => a + (b.n || 0), 0);
+  const left = activeCards().length;
+  sheet(`<h3>Dag afronden</h3>
+    <div class="sumgrid"><div><small>Inkopen</small><b class="num">${buys.length}</b></div><div><small>Kaarten</small><b class="num">${n}</b></div><div><small>Uitgegeven</small><b class="num">${EUR.format(paid)}</b></div></div>
+    ${left ? `<div class="notice"><b>Er staan nog ${left} kaarten in je lijst die niet zijn ingekocht.</b> Die gaan niet mee naar de sheet.</div>` : ""}
+    <p class="fine">Er komt een nieuw tabblad in je Kaartpricer sheet met elke ingekochte kaart, de inkoopprijs per kaart en onderaan de totalen per inkoop.</p>
+    <button class="btn primary wide" data-f="sheet">Naar Google Sheet</button>
+    <button class="btn wide" data-f="copy">Kopieer overzicht</button>`,
+    async (e, close) => {
+      const f = e.target.closest("[data-f]"); if (!f) return;
+      if (f.dataset.f === "copy") { copyRows(dayRows(), "Overzicht gekopieerd"); return; }
+      f.disabled = true;
+      const l0 = listOf(), who = (l0 && l0.door) || ME.name;
+      const title = await sheetWrite(`${l0 ? l0.naam : "Beurs"} inkopen${who ? " " + who : ""}`, dayRows());
+      f.disabled = false;
+      if (title) { const l = listOf(); if (l) await putList({ ...l, afgerond: Date.now() }).catch(() => {}); close(); render(); }
+    });
+}
+
+/* vegen om te verwijderen */
+let sw = null;
+document.addEventListener("touchstart", e => {
+  const card = e.target.closest(".swipe > .card");
+  if (!card || e.touches.length !== 1 || card.querySelector(".detail") || e.target.closest("input, a, button")) { sw = null; return; }
+  sw = { card, wrap: card.parentElement, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, on: false };
+}, { passive: true });
+document.addEventListener("touchmove", e => {
+  if (!sw) return; const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+  if (!sw.on) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+    if (dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.3) { sw.on = true; sw.card.style.transition = "none"; } else return;
+  }
+  e.preventDefault(); sw.dx = Math.min(0, dx); sw.card.style.transform = `translateX(${sw.dx}px)`;
+  sw.wrap.classList.toggle("armed", -sw.dx > Math.min(110, sw.wrap.offsetWidth * 0.3));
+}, { passive: false });
+function endSwipe() {
+  if (!sw) return; const s = sw; sw = null; if (!s.on) return;
+  swallowClick = true; setTimeout(() => { swallowClick = false; }, 350);
+  s.card.style.transition = "transform .18s ease";
+  if (-s.dx > Math.min(110, s.wrap.offsetWidth * 0.3)) { s.card.style.transform = "translateX(-105%)"; setTimeout(() => deleteCard(s.wrap.dataset.s, s.wrap.dataset.k), 170); }
+  else { s.card.style.transform = ""; s.wrap.classList.remove("armed"); }
+}
+document.addEventListener("touchend", endSwipe); document.addEventListener("touchcancel", endSwipe);
+
+/* exporteren */
+function rows() {
+  const mixed = overrides().any;     // met eigen % per foto of kaart komt er een kolom Bod % bij
+  const out = [["Naam", "Set", "Nummer", "Trend", "Prijs", mixed ? "Bod" : `Bod ${pct()}%`, ...(mixed ? ["Bod %"] : []), "Cardmarket (NL, NM)"]];
+  for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
+    const { card, trend, bod, pct: p } = priceOf(k, s);
+    out.push([card ? card.name + (k.rev ? " (reverse)" : "") : (k.lez.name || "?"), card ? `${card.set.name} (${codeOf(card)})` : "", card ? "'" + numOf(card, k.lez.number) : "",
+      trend ?? "", effPrice(k) ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card), card, !!k.rev) : ""]);
+  }
+  return out;
+}
+async function copyRows(data, done) {
+  const txt = data.map(r => r.map(v => typeof v === "number" ? String(v).replace(".", ",") : String(v).replace(/^'/, "")).join("\t")).join("\n");
+  try { await navigator.clipboard.writeText(txt); toast(done); }
+  catch { sheet(`<h3>Kopieer</h3><textarea class="field" style="height:50vh;padding:10px" readonly>${esc(txt)}</textarea>`); }
+}
+const copyList = () => copyRows(rows(), "Lijst gekopieerd");
+async function toSheet() {
+  const data = rows(); if (data.length < 2) { toast("Nog geen kaarten om te versturen"); return; }
+  const l = listOf(), who = (l && l.door) || ME.name;
+  await sheetWrite((l ? l.naam : "Kaartscan") + (who ? " " + who : ""), data);
+}
+const colName = n => { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+async function sheetWrite(name, data) {
+  if (!S.mcp) { toast("Google Sheets is niet beschikbaar in deze weergave"); return null; }
+  const base = String(name).replace(/[\[\]*?:\/\\']/g, " ").slice(0, 80);
+  const width = Math.max(...data.map(r => r.length));
+  toast("Naar Google Sheet sturen…");
+  let title = base;
+  try {
+    try { await S.mcp.callTool("Google Sheets", "update_spreadsheet", { spreadsheetId: SHEET_ID, requests: [{ addSheet: { properties: { title, index: 0 } } }] }); }
+    catch (e) {
+      if (e && e.code === "tool_error") { title = `${base} ${fmtTime(Date.now()).replace(":", ".")}`; await S.mcp.callTool("Google Sheets", "update_spreadsheet", { spreadsheetId: SHEET_ID, requests: [{ addSheet: { properties: { title, index: 0 } } }] }); }
+      else throw e;
+    }
+    await S.mcp.callTool("Google Sheets", "update_values", { spreadsheetId: SHEET_ID, range: `'${title}'!A1:${colName(width)}${data.length}`, values: data.map(r => r.length ? r : [""]) });
+    toast(`In je sheet gezet, tabblad ${title}`, 4500);
+    return title;
+  } catch (e) {
+    const c = e && e.code;
+    const msg = c === "needs_reauth" ? "Koppel Google Sheets opnieuw in claude.ai bij Instellingen, Connectors"
+      : c === "server_not_connected" ? "Voeg Google Sheets toe in claude.ai bij Instellingen, Connectors"
+      : c === "not_in_manifest" || c === "approval_required" ? "Google Sheets heeft nog geen toestemming voor deze pagina. Probeer opnieuw en sta het toe"
+      : c === "server_unavailable" || c === "upstream_error" ? "Google Sheets reageert niet. Kijk in je sheet of het tabblad er al staat voor je het opnieuw probeert"
+      : "Naar Google Sheet sturen mislukt" + (e && e.message ? ": " + String(e.message).slice(0, 120) : "");
+    toast(msg, 6000);
+    return null;
+  }
+}
+let toastT = null;
+function toast(msg, ms = 3200, action) {
+  const h = $("#toastHost"); h.innerHTML = `<div class="toast"><span>${esc(msg)}</span>${action ? `<button class="toastbtn" id="toastAct" type="button">${esc(action.label)}</button>` : ""}</div>`;
+  if (action) $("#toastAct").addEventListener("click", () => { h.innerHTML = ""; action.fn(); });
+  clearTimeout(toastT); toastT = setTimeout(() => { h.innerHTML = ""; }, ms);
+}
+
+/* ---------------------------------------------------------------- camera met kader (alleen in de losse app)
+   iPhone zet de camera stil zodra de app naar de achtergrond gaat (bijvoorbeeld even naar Cardmarket). Daarom: bij weggaan de camera
+   netjes vrijgeven, bij terugkomen opnieuw starten, een vastgelopen start afbreken en opnieuw proberen, en als het echt niet lukt een
+   knop tonen voor de gewone camera (die mag iPhone alleen openen direct na een tik). */
+const CAM = { stream: null, el: null, starting: false, torch: false, black: 0 };
+function stopCam() { if (CAM.stream) { CAM.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); CAM.stream = null; } }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+/* getUserMedia met een tijdslimiet. Komt het antwoord toch nog (bijvoorbeeld omdat iemand traag op Sta toe tikte),
+   dan gebruiken we die camera alsnog als het scherm erop wacht, en anders zetten we hem meteen weer uit. Een
+   vergeten camera houdt hem bezet, waarna elke volgende poging mislukt. */
+function gum(c, ms) {
+  const p = navigator.mediaDevices.getUserMedia(c);
+  return new Promise((res, rej) => {
+    let late = false;
+    const t = setTimeout(() => {
+      late = true; const e = new Error("timeout"); e.name = "TimeoutError"; rej(e);
+      p.then(st => { if (CAM.el && !CAM.stream) attachStream(CAM.el, st); else st.getTracks().forEach(x => x.stop()); }, () => {});
+    }, ms);
+    p.then(st => { if (!late) { clearTimeout(t); res(st); } }, e => { if (!late) { clearTimeout(t); rej(e); } });
+  });
+}
+async function getStream() {
+  stopCam();
+  // 4:3 zoals de fotocamera zelf: rechtop gehouden meer pixels per kaart dan breedbeeld, dus scherpere nummers
+  const best = { video: { facingMode: { ideal: "environment" }, width: { ideal: 4032 }, height: { ideal: 3024 }, aspectRatio: { ideal: 4 / 3 } }, audio: false };
+  const basic = { video: { facingMode: "environment" }, audio: false };
+  let last = null;
+  for (const [c, ms, pause] of [[best, 10000, 0], [best, 5000, 600], [basic, 5000, 600]]) {
+    if (pause) await wait(pause);
+    if (!CAM.el || CAM.stream) return null;                            // gesloten, of een laat antwoord is al in gebruik genomen
+    try { const st = await gum(c, ms); if (CAM.stream) { st.getTracks().forEach(x => x.stop()); return null; } return st; }
+    catch (e) { last = e; if (e && e.name === "NotFoundError") break; }
+  }
+  throw last || new Error("geen camera");
+}
+function attachStream(el, stream) {
+  const video = $("video", el);
+  CAM.stream = stream; video.srcObject = stream; video.muted = true; video.play().catch(() => {});
+  $(".camerr", el).hidden = true;
+  const tr = stream.getVideoTracks()[0];
+  if (tr) tr.addEventListener("ended", () => { if (CAM.el && CAM.stream === stream && !document.hidden) { CAM.stream = null; setTimeout(() => startCam(), 400); } });
+  const caps = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+  $(".torch", el).hidden = !caps.torch; CAM.torch = false; $(".torch", el).setAttribute("aria-pressed", "false");
+  $(".hint", el).textContent = "Leg de pagina precies in het kader";
+  setTimeout(() => {                                                   // zwart beeld: nog een paar keer opnieuw, daarna een melding
+    if (CAM.el !== el || CAM.stream !== stream) return;
+    if (video.videoWidth) { CAM.black = 0; return; }
+    stopCam(); if (++CAM.black <= 2) startCam(); else camError(el, { name: "BlackScreen" });
+  }, 3000);
+}
+function camError(el, e) {
+  const n = (e && e.name) || "";
+  const [msg, tip] = n === "NotAllowedError" || n === "SecurityError"
+    ? ["De camera heeft geen toestemming.", "Tik op Opnieuw proberen en kies Sta toe. Komt er geen vraag, zet dan in Instellingen, Apps, Safari, Camera op Vraag of Sta toe."]
+    : n === "NotReadableError" || n === "AbortError" ? ["De camera is bezet.", "Een andere app of een vorige poging gebruikt hem nog. Tik op Opnieuw proberen."]
+    : n === "TimeoutError" ? ["De camera reageert niet.", "Tik op Opnieuw proberen. Helpt dat niet, sluit de app helemaal en open hem opnieuw."]
+    : n === "BlackScreen" ? ["De camera geeft geen beeld.", "Tik op Opnieuw proberen of gebruik de gewone camera."]
+    : n === "NotFoundError" || n === "OverconstrainedError" ? ["Geen camera gevonden.", "Gebruik de gewone camera."]
+    : ["De camera start niet.", "Tik op Opnieuw proberen of gebruik de gewone camera."];
+  $(".camerr p", el).textContent = msg; $(".camerr .fine", el).textContent = tip + (n ? ` (${n})` : "");
+  $(".camerr", el).hidden = false; $(".hint", el).textContent = "";
+}
+async function startCam(auto = true) {
+  if (!CAM.el || CAM.starting) return; CAM.starting = true;
+  const el = CAM.el; $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
+  try {
+    const stream = await getStream(); if (!stream) return;
+    if (!CAM.el || CAM.el !== el) { stream.getTracks().forEach(t => t.stop()); return; }      // intussen gesloten
+    attachStream(el, stream);
+  } catch (e) {
+    if (CAM.el !== el || CAM.stream) return;
+    const quick = e && e.name !== "TimeoutError" && e.name !== "NotFoundError";
+    // net terug uit de achtergrond weigert iOS soms heel even: één keer stil opnieuw voordat we een melding tonen
+    if (auto && quick) { CAM.starting = false; await wait(1200); if (CAM.el === el && !CAM.stream) return startCam(false); return; }
+    camError(el, e);
+  } finally { CAM.starting = false; }
+}
+function closeCam() { stopCam(); if (CAM.el) CAM.el.remove(); CAM.el = null; CAM.black = 0; }
+document.addEventListener("visibilitychange", () => {
+  if (!CAM.el) return;
+  if (document.hidden) { stopCam(); return; }
+  setTimeout(() => { if (CAM.el && !document.hidden && !CAM.stream) startCam(); }, 350);   // iOS geeft de camera pas vrij als de app echt vooraan staat
+});
+window.addEventListener("pagehide", stopCam);
+async function openCam() {
+  if (CAM.el) { startCam(); return; }
+  const el = document.createElement("div"); el.className = "cam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Camera");
+  el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Camera starten…</div></div><div class="flash"></div>
+    <div class="camerr" hidden><p>De camera start niet.</p><span class="fine"></span><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
+    <button class="native" type="button" data-cam="native">iPhone camera</button>
+    <button class="torch" type="button" aria-label="Lamp" aria-pressed="false" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4zM10 8h4v13h-4z"/></svg></button>
+    <div class="bar"><button class="x" type="button">Sluiten</button><button class="shut" type="button" aria-label="Foto maken"></button><button class="done" type="button">Klaar</button></div>`;
+  document.body.appendChild(el); CAM.el = el;
+  const video = $("video", el); let n = 0;
+  $(".x", el).addEventListener("click", closeCam); $(".done", el).addEventListener("click", closeCam);
+  $("[data-cam='retry']", el).addEventListener("click", () => { CAM.black = 0; stopCam(); startCam(false); });
+  el.querySelectorAll("[data-cam='native']").forEach(b => b.addEventListener("click", () => { closeCam(); $("#pickCamera").click(); }));    // direct na een tik, dan mag het
+  $(".torch", el).addEventListener("click", async () => {
+    const tr = CAM.stream && CAM.stream.getVideoTracks()[0]; if (!tr) return;
+    CAM.torch = !CAM.torch; try { await tr.applyConstraints({ advanced: [{ torch: CAM.torch }] }); } catch { CAM.torch = false; }
+    $(".torch", el).setAttribute("aria-pressed", String(CAM.torch));
+  });
+  $(".shut", el).addEventListener("click", async () => {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !CAM.stream) { startCam(); return; }
+    const vr = video.getBoundingClientRect(), gr = $(".guide", el).getBoundingClientRect();
+    const sc = Math.max(vr.width / vw, vr.height / vh), ox = (vr.width - vw * sc) / 2, oy = (vr.height - vh * sc) / 2, pad = 0.05;
+    let w = gr.width / sc, h = gr.height / sc, x0 = (gr.left - vr.left - ox) / sc - w * pad, y0 = (gr.top - vr.top - oy) / sc - h * pad;
+    w *= 1 + 2 * pad; h *= 1 + 2 * pad; x0 = Math.max(0, x0); y0 = Math.max(0, y0); w = Math.min(vw - x0, w); h = Math.min(vh - y0, h);
+    const c = canvasOf(w, h); c.getContext("2d").drawImage(video, x0, y0, w, h, 0, 0, c.width, c.height);
+    const fl = $(".flash", el); fl.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => fl.classList.remove("on")));
+    const blob = await toBlob(c, 0.94); n++; $(".done", el).textContent = `Klaar (${n})`;
+    addFiles([new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" })]);
+  });
+  await startCam();
+}
+if (STANDALONE && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) $(".fab").addEventListener("click", e => { e.preventDefault(); openCam(); });
+
+async function importSeed() {
+  if (!S.db) { toast("Opslag niet beschikbaar"); return; }
+  const r = await fetch("/seed.json", { cache: "no-store" }).catch(() => null);
+  if (!r || !r.ok) { toast("Er staat niets klaar om te importeren"); return; }
+  if (!ME.name) { openWho(importSeed); return; }
+  const j = await r.json(); let n = 0, skip = 0;
+  const have = new Set(S.lists.map(l => l.id));        // al aanwezige lijsten niet overschrijven, ook niet als iemand anders nog eens importeert
+  toast("Importeren…", 60000);
+  for (const d of j.docs || []) {
+    const parts = String(d.path).split("/"); if (have.has(parts[1])) { skip++; continue; }
+    const data = parts.length === 2 ? { ...d.data, door: d.data.door || ME.name } : d.data;
+    try { await S.db.doc(d.path).set(data); n++; } catch {}
+  }
+  toast(n ? `${n} onderdelen geïmporteerd als lijsten van ${ME.name}` : skip ? "Die lijsten staan er al" : "Niets geïmporteerd", 4000);
+}
+
+/* ---------------------------------------------------------------- start */
+async function boot() {
+  render();
+  const cl = window.claude && typeof window.claude.use === "function" ? window.claude : null;
+  const [db, sample, mcp] = await Promise.all([
+    cl ? cl.use("db").catch(() => null) : null, cl ? cl.use("sample").catch(() => null) : null, cl ? cl.use("mcp").catch(() => null) : null,
+    loadData().catch(() => { S.loadError = true; }),
+  ]);
+  S.db = db; S.sample = sample; S.mcp = mcp; S.boot = true;
+  if (sample && sample.limits) S.limits = await sample.limits().catch(() => null);
+  if (db) watchLists();
+  else { S.local = true; loadLocal(); const l = pickDefaultList(); if (l) S.listId = l.id; }
+  watchMem();
+  render();
+  if (!ME.name && (db || STANDALONE)) setTimeout(() => { if (!ME.name && !$("#sheetHost").innerHTML) openWho(); }, 600);
+}
+boot();
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
+</body>
+</html>
