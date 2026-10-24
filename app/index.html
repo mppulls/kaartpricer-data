@@ -225,6 +225,9 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .mtile.danger { box-shadow: inset 0 0 0 1.5px var(--bad-soft); } .mtile.danger b { color: var(--bad); }
 .btn.danger.solid { background: var(--bad); color: #fff; }
 .fine.team { color: var(--ok); font-weight: 600; }
+/* reverse aan: duidelijke rand rondom, nog een keer tikken zet hem uit */
+.btn.revbtn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.lowtools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .lowtools .revbtn { height: 32px; font-size: 13px; padding: 0 11px; }
 .confirm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .confirm .btn { height: 46px; justify-content: center; }
 .warnhead { display: flex; align-items: center; gap: 10px; }
 .field { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
@@ -294,6 +297,7 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .cam .camerr { grid-row: 1; grid-column: 1; align-self: center; justify-self: center; z-index: 2; display: grid; gap: 10px; justify-items: center; background: rgba(0,0,0,.78); padding: 20px; border-radius: 16px; text-align: center; }
 .cam .camerr[hidden] { display: none; }
 .cam .camerr p { margin: 0 0 4px; font-weight: 600; }
+.cam .camerr .fine { color: rgba(255,255,255,.78); max-width: 290px; margin-bottom: 4px; }
 .cam .torch { grid-row: 1; grid-column: 1; align-self: start; justify-self: end; z-index: 2; margin: calc(14px + env(safe-area-inset-top, 0px)) 14px 0 0; width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; display: grid; place-items: center; }
 .cam .torch[aria-pressed="true"] { background: #ffd54a; color: #000; }
 .cam .native { grid-row: 1; grid-column: 1; align-self: start; justify-self: start; z-index: 2; margin: calc(18px + env(safe-area-inset-top, 0px)) 0 0 16px; padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; font-size: 13px; font-weight: 600; }
@@ -359,7 +363,12 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 // Cardmarket conditie: 2 = Near Mint of beter, 4 = Good of beter. Sets uit 2016 en eerder (vintage tot en met XY) vanaf Good,
 // want die kopen we zelden NM in. 2017 en nieuwer vanaf Near Mint.
 const cmCond = card => card && card.set && card.set.rel && card.set.rel < "2017" ? 4 : 2;
-const cmLink = (pid, card) => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`;
+/* reverse holo is bij Cardmarket een kenmerk van het aanbod, geen apart product: filter Y voor reverse, N voor de gewone versie
+   van een kaart die ook als reverse bestaat (anders zit de reverse er tussen) */
+const canRev = card => !!(card && trendOf(card, true));
+const revParam = (card, rev) => rev === true ? "&isReverseHolo=Y" : rev === false && canRev(card) ? "&isReverseHolo=N" : "";
+const cmLink = (pid, card, rev) => `https://www.cardmarket.com/en/Pokemon/Products?idProduct=${pid}&sellerCountry=23&minCondition=${cmCond(card)}&language=1${revParam(card, rev)}`;
+const cmLabel = (card, rev) => `NL ${cmCond(card) === 4 ? "Good" : "NM"}${rev ? " reverse" : ""}`;
 const round2 = x => Math.round(x * 100) / 100;
 const isNum = v => typeof v === "number" && Number.isFinite(v);
 const parseMoney = v => { const n = parseFloat(String(v || "").replace(/[^\d,.]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return Number.isFinite(n) && n >= 0 ? round2(n) : null; };
@@ -526,6 +535,19 @@ function applyId(k, res) {
   k.st = res.st; k.sid = res.card ? res.card.sid : null; k.lid = res.card ? res.card.lid : null;
   k.alts = (res.alts || []).map(a => [a.sid, a.lid]); if (res.lang) k.lang = res.lang;
 }
+/* reverse uit de foto: alleen bij een gewone kaart die ook als reverse bestaat. Herkend wordt gemarkeerd, uittikken kan altijd */
+function autoRev(k, seen) {
+  if (k.revManual) return;
+  const card = k.sid ? CAT.byKey.get(k.sid + "|" + k.lid) : null;
+  const on = seen === true && k.lez.art !== "full" && canRev(card);
+  k.rev = on; k.revAuto = on;
+}
+function toggleRev(sId, key) {
+  const s = scanById(sId), k0 = s && s.kaarten.find(x => x.k === key); if (!k0) return;
+  const had = priceVal(k0) != null, to = !k0.rev;
+  editCard(sId, key, k => { k.rev = to; k.revAuto = false; k.revManual = true; if (had) { k.low = null; k.eigen = null; k.lowT = null; } });
+  if (had) toast(`${to ? "Reverse" : "Gewone versie"}: je prijs is gewist omdat die bij de ${to ? "gewone versie" : "reverse"} hoorde`, 4000);
+}
 
 /* ---------------------------------------------------------------- beelden */
 async function toBitmap(file) {
@@ -625,7 +647,7 @@ function stripId(o) { const { id, ...rest } = o; return rest; }
 async function putScan(s) {
   if (S.gone.has(s.id)) return;                              // net verwijderd terwijl hij nog gelezen werd: niet terugzetten
   const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null, pct: isNum(s.pct) ? s.pct : null, trend: typeof s.trend === "boolean" ? s.trend : null,
-    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null, pct: isNum(k.pct) ? k.pct : null })) };
+    kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, revAuto: !!k.revAuto, revManual: !!k.revManual, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null, pct: isNum(k.pct) ? k.pct : null })) };
   if (S.db) {
     const path = `lijsten/${s.list}/scans/${s.id}`;
     try { await serial(path, () => S.db.doc(path).set(body)); }
@@ -680,12 +702,13 @@ async function ensureList() { if (!listOf()) await newList(); return listOf(); }
 const STEP1 = `You are reading a phone photo of Pokémon trading cards: usually one binder page in a 3x3 grid, sometimes loose cards on a table.
 List every card that is fully or mostly visible, row by row, left to right. Skip empty pockets, and skip cards that are cut off at the photo edge or belong to the facing page.
 Write exactly one line of JSON per card and nothing else (no code fence, no commentary):
-{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"level":null,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","lang":"en","sticker":null}
+{"box":[x0,y0,x1,y1],"name":"Mew ex","hp":180,"level":null,"attacks":["Restart","Genome Hacking"],"set":null,"number":null,"art":"full","reverse":false,"lang":"en","sticker":null}
 box: the card outline as fractions (0 to 1) of the photo width and height.
 name: exactly as printed, with ex, V, VMAX, VSTAR, GX and owner prefixes such as N's, Misty's or Team Rocket's. Trainers and energy: the card title.
 hp: the number, or null. level: the LV. number printed next to the name on Diamond & Pearl and Platinum era cards (like 46), else null; keep it out of the name. attacks: up to two ability or attack names as printed.
 set and number: from the small print along the bottom edge. Newer cards (Sword & Shield, Scarlet & Violet, Mega Evolution) print a letter code and number bottom left, like "MEW" and "205/165" or "SVP" and "053". Older cards (Sun & Moon, XY, Black & White and earlier) print only a set symbol and the number, usually bottom right, like "101/108": then set is null. Only fill them in if you can really read them, else null. Never guess.
 art: "full" when the artwork covers the whole card (illustration rare, full art, special illustration rare, gold), else "regular".
+reverse: true only for a regular card whose frame, borders and text box (everything outside the artwork window) clearly shine with holographic foil (rainbow, glitter or pattern) while the artwork itself is flat. Glare on a sleeve or binder page is not foil. false when the card body is plain or when unsure.
 lang: the card language as a code, like "en", "ja", "ko", "de".
 sticker: the text of a price sticker on the sleeve, else null.`;
 const STEP2 = `Each image holds one or more horizontal strips. Every strip is the bottom edge of one Pokémon card and has a yellow label #1, #2 and so on in its top left corner.
@@ -693,8 +716,9 @@ For every strip, read the collector number printed along the bottom edge of the 
 Newer cards print it bottom left, after a letter set code such as MEW, PAF, OBF, SVP, MEP, JTG (often followed by EN).
 Older cards (Sun & Moon, XY, Black & White and earlier) print it bottom right next to a set symbol, without a letter code.
 Formats look like 101/108, 205/165, 053, TG13/TG30, SV41/SV94, RC5/RC32, GG01/GG70, SWSH291, XY121, BW45, SM210.
-Write exactly one line of JSON per strip and nothing else: {"i":1,"set":"MEW","number":"205/165"}
-set is the letter code only when one is printed, else null. Use null for anything you cannot read with certainty. Never guess.`;
+Also say whether the card surface in the strip (text box, borders, weakness bar) shows the holographic foil of a reverse holo: a rainbow, glitter or repeating shiny pattern across the card itself. Plain glossy or matte card is not reverse, and glare on a sleeve is not foil.
+Write exactly one line of JSON per strip and nothing else: {"i":1,"set":"MEW","number":"205/165","reverse":false}
+set is the letter code only when one is printed, else null. reverse is true, false, or null when you cannot tell. Use null for anything you cannot read with certainty. Never guess.`;
 /* stap 2: alleen de onderrand van elke kaart, scherp en met wat extra contrast, drie per afbeelding. Weinig tokens, wel goed leesbaar. */
 const STRIP_W = 1000, STRIP_H = 300, STRIP_GAP = 16, STRIPS_PER_IMG = 3;
 function autoLevels(g, w, h) {                                        // donkere of flauwe foto: grijswaarden oprekken
@@ -776,8 +800,8 @@ async function runJob(job) {
     let pending = "";
     const take = line => {
       const r = parseLine(line); if (!r || !(r.name || r.box)) return;
-      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, level: r.level || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null }, rev: false, eigen: null };
-      applyId(k, identify(k.lez)); k.thumb = k.box ? thumbOf(bm, k.box, s.dim) : null;
+      const k = { k: uid(), box: Array.isArray(r.box) ? r.box : null, lez: { name: r.name || "", hp: r.hp || null, level: r.level || null, attacks: Array.isArray(r.attacks) ? r.attacks.slice(0, 2) : [], set: r.set || null, number: r.number || null, art: r.art || null, lang: r.lang || "en", sticker: r.sticker || null, reverse: r.reverse === true }, rev: false, eigen: null };
+      applyId(k, identify(k.lez)); autoRev(k, k.lez.reverse); k.thumb = k.box ? thumbOf(bm, k.box, s.dim) : null;
       s.kaarten.push(k); S.fresh.add(k.k); s._v++; render();
     };
     const opts = { images: [blob], modelTier: job.tier, onText: ({ delta }) => { const lines = (pending + delta).split("\n"); pending = lines.pop(); lines.forEach(take); } };
@@ -786,7 +810,7 @@ async function runJob(job) {
     await S.sample(STEP1, opts);
     if (pending.trim()) take(pending);
     if (!s.kaarten.length) { s.status = "leeg"; s._v++; await persist(s); return; }
-    const need = s.kaarten.filter(k => k.st !== "ok" && k.box && !k.lang);
+    const need = s.kaarten.filter(k => (k.st !== "ok" || k.rev) && k.box && !k.lang);
     if (need.length) { s.status = "nummers"; s._v++; render(); await readNumbers(s, bm, need); }
     if (IMG_ON) await visualOrder(s, bm).catch(() => {});
     s.status = "klaar"; s.n = s.kaarten.length; s._v++; render();
@@ -809,7 +833,9 @@ async function readNumbers(s, bm, need) {
       text.split("\n").map(parseLine).filter(Boolean).forEach(r => {
         const k = ks[Number(r.i) - 1]; if (!k) return;
         if (r.set) k.lez.set = r.set; if (r.number) k.lez.number = r.number;
-        applyId(k, identify(k.lez));
+        if (k.st !== "ok" || r.set || r.number) applyId(k, identify(k.lez));
+        k.lez.reverse = r.reverse === true;                            // reverse alleen als de scherpe onderrand het bevestigt
+        autoRev(k, k.lez.reverse);
       });
       s._v++; render();
     } catch (e) { if (e && (e.code === "not_granted" || e.code === "rate_limited")) throw e; }
@@ -1140,8 +1166,8 @@ function detailHtml(s, k, card, own) {
   h += `<div class="own"><span class="lbl" aria-hidden="true">&nbsp;</span><button class="nextbtn" data-act="next" ${ids} aria-label="Opslaan en volgende kaart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div></div>`;
   const vOpen = S.vers === k.k;
   h += `<div class="actions">
-    ${card ? `<a class="btn primary" href="${cmFor(card)}" target="cardmarket">${pid ? "Cardmarket NL NM" : "Zoek op Cardmarket"}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
-    <button class="btn" data-act="rev" ${ids} aria-pressed="${k.rev}">Reverse</button>
+    ${card ? `<a class="btn primary" href="${cmFor(card, !!k.rev)}" target="cardmarket">${pid ? "Cardmarket " + cmLabel(card, k.rev) : "Zoek op Cardmarket"}<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>` : ""}
+    <button class="btn revbtn" data-act="rev" ${ids} aria-pressed="${!!k.rev}">Reverse${k.revAuto ? " herkend" : ""}</button>
     <button class="btn vbtn" data-act="vers" ${ids} aria-pressed="${vOpen}" aria-expanded="${vOpen}">Andere versies</button>
     <button class="btn danger" data-act="del" ${ids}>Verwijder</button></div>`;
   if (vOpen) h += versHtml(k, card, `data-act="pick" ${ids}`, `data-act="search" ${ids}`, trendOn(s));
@@ -1182,7 +1208,7 @@ document.addEventListener("click", e => {
   else if (act === "vers") { S.vers = S.vers === key ? null : key; render(); }
   else if (act === "next") goNext(sId, key);
   else if (act === "lowfocus") { S.open = key; S.vers = null; S.lastField = "low"; draw(); const i = document.getElementById("low-" + key); if (i) i.focus(); }
-  else if (act === "rev") editCard(sId, key, k => { k.rev = !k.rev; });
+  else if (act === "rev") toggleRev(sId, key);
   else if (act === "del") deleteCard(sId, key);
   else if (act === "buyopen") { S.openBuy = S.openBuy === a.dataset.b ? null : a.dataset.b; render(); }
   else if (act === "buydelask") { const box = document.getElementById("bd-" + a.dataset.b); if (box) box.innerHTML = `<div class="notice">Deze inkoop verdwijnt uit je overzicht. <button class="btn danger" data-act="buydel" data-b="${a.dataset.b}">Ja, verwijder</button></div>`; }
@@ -1439,7 +1465,7 @@ function searchPass(q, fuzzy) {
 }
 // zonder Cardmarket nummer: zoeken op naam zoals Cardmarket hem schrijft (M Charizard EX heet daar MCharizard EX)
 const cmName = n => String(n || "").replace(/^M (?=[A-Z])/, "M").replace(/\s*[-–]\s*(EX|GX)\b/, " $1").replace(/\s*[☆★]/, " Gold Star");   // Espeon ☆ heet daar Espeon Gold Star
-function cmFor(card) { const pid = pidOf(card); return pid ? cmLink(pid, card) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`; }
+function cmFor(card, rev) { const pid = pidOf(card); return pid ? cmLink(pid, card, rev) : `https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${encodeURIComponent(cmName(card.name))}&sellerCountry=23&minCondition=${cmCond(card)}&language=1`; }
 function openSearch(sId, key, opts = {}) {
   const s0 = sId && scanById(sId); const k0 = s0 && s0.kaarten.find(k => k.k === key);
   const start = k0 ? k0.lez.name : (S.lastQ || ""), showT = s0 ? trendOn(s0) : listTrend();
@@ -1515,7 +1541,7 @@ function drawLow(el) {
     return;
   }
   const { s, k } = cur; const card = CAT.byKey.get(k.sid + "|" + k.lid); const pid = pidOf(card); const t = trendOf(card, k.rev);
-  const link = cmFor(card);
+  const link = cmFor(card, !!k.rev);
   const tm = teamOf(k), pre = priceVal(k) ?? (tm ? tm.p : null);
   const preTxt = tm ? memText(tm) : priceVal(k) != null ? `Al ingevuld${k.lowT ? " om " + fmtTime(k.lowT) : ""}` : "";
   const pctDone = Math.round(r.i / r.items.length * 100);
@@ -1524,11 +1550,11 @@ function drawLow(el) {
     <div class="lowcard">${k.thumb ? `<img src="${k.thumb}" alt="">` : (refImg(card, "ph") || `<span class="ph"></span>`)}
       <div><b>${esc(card.name)}${k.rev ? " (reverse)" : ""}</b><span class="code">${esc(codeOf(card))} ${esc(numOf(card, k.lez.number))}</span> <span class="tag">${esc(shortRar(card.rar || ""))}</span>
       <div class="fine">${esc(card.set.name)}</div><div class="fine num">${trendOn(s) ? `Trend ${t ? EUR.format(t) : "onbekend"}` : ""}</div>
-      <button class="linkbtn vlink" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button></div></div>
+      <div class="lowtools"><button class="linkbtn vlink" data-low="vers" aria-expanded="${!!LOW.vers}">${LOW.vers ? "Verberg andere versies" : "Andere versie?"}</button>${canRev(card) || k.rev ? `<button class="btn revbtn" data-low="rev" aria-pressed="${!!k.rev}">Reverse${k.revAuto ? " herkend" : ""}</button>` : ""}</div></div></div>
     ${LOW.vers ? versHtml(k, card, `data-low="pick"`, `data-low="search"`, trendOn(s)) : ""}
-    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">${pid ? "Open Cardmarket NL NM" : "Zoek op Cardmarket"}
+    <a class="btn primary wide" href="${link}" target="cardmarket" data-low="opened">${pid ? "Open Cardmarket " + cmLabel(card, k.rev) : "Zoek op Cardmarket"}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
-    <label class="lbl" for="lowIn">Prijs (laagste NL ${cmCond(card) === 4 ? "Good" : "NM"})</label>
+    <label class="lbl" for="lowIn">Prijs (laagste ${cmLabel(card, k.rev)})</label>
     <input class="bigin" id="lowIn" inputmode="decimal" enterkeyhint="next" placeholder="0,00" autocomplete="off" value="${pre != null ? moneyIn(pre) : ""}">
     ${preTxt ? `<div class="fine team" style="margin-top:-10px">${esc(preTxt)}</div>` : ""}
     <button class="btn primary wide" data-low="save">Opslaan en volgende</button>
@@ -1543,6 +1569,7 @@ async function lowClick(e, close) {
   if (a === "opened") { if (r) r.opened = true; return; }
   if (!r) return;
   if (a === "vers") { LOW.vers = !LOW.vers; drawLow(el); return; }
+  if (a === "rev") { const cur = lowItem(); if (cur) toggleRev(cur.s.id, cur.k.k); drawLow(el); return; }
   if (a === "pick") { const cur = lowItem(); if (cur) pickVersion(cur.s.id, cur.k.k, b.dataset.key); LOW.vers = false; drawLow(el); return; }
   if (a === "search") { const cur = lowItem(); if (cur) { LOW.vers = false; openSearch(cur.s.id, cur.k.k, { onClose: resumeLow }); } return; }
   LOW.vers = false;
@@ -1660,7 +1687,7 @@ function dayRows() {
   const out = [["Inkoop", "Tijd", "Verkoper", "Betaald via", "Naam", "Set", "Nummer", "Trend", "Prijs", "Inkoopprijs", "Cardmarket (NL, NM)"]];
   for (const b of buys) for (const c of b.kaarten || [])
     out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", c.naam + (c.rev ? " (reverse)" : ""), c.set ? `${c.set} (${c.code})` : "", c.nr ? "'" + c.nr : "",
-      c.trend ?? "", isNum(c.eigen) ? c.eigen : (c.low ?? ""), c.inkoop ?? "", c.pid ? cmLink(c.pid, c.sid ? CAT.byKey.get(c.sid + "|" + c.lid) : null) : ""]);
+      c.trend ?? "", isNum(c.eigen) ? c.eigen : (c.low ?? ""), c.inkoop ?? "", c.pid ? cmLink(c.pid, c.sid ? CAT.byKey.get(c.sid + "|" + c.lid) : null, !!c.rev) : ""]);
   out.push([]);
   out.push(["Inkoop", "Tijd", "Verkoper", "Betaald via", "Kaarten", "Trend totaal", "Betaald"]);
   for (const b of buys) out.push([b.nr, fmtTime(b.t), b.verkoper || "", b.via || "", b.n, b.trend || 0, b.betaald || 0]);
@@ -1720,7 +1747,7 @@ function rows() {
   for (const s of allScans().slice().reverse()) for (const k of s.kaarten || []) {
     const { card, trend, bod, pct: p } = priceOf(k, s);
     out.push([card ? card.name + (k.rev ? " (reverse)" : "") : (k.lez.name || "?"), card ? `${card.set.name} (${codeOf(card)})` : "", card ? "'" + numOf(card, k.lez.number) : "",
-      trend ?? "", effPrice(k) ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card), card) : ""]);
+      trend ?? "", effPrice(k) ?? "", bod ?? "", ...(mixed ? [p] : []), card && pidOf(card) ? cmLink(pidOf(card), card, !!k.rev) : ""]);
   }
   return out;
 }
@@ -1773,52 +1800,98 @@ function toast(msg, ms = 3200, action) {
    iPhone zet de camera stil zodra de app naar de achtergrond gaat (bijvoorbeeld even naar Cardmarket). Daarom: bij weggaan de camera
    netjes vrijgeven, bij terugkomen opnieuw starten, een vastgelopen start afbreken en opnieuw proberen, en als het echt niet lukt een
    knop tonen voor de gewone camera (die mag iPhone alleen openen direct na een tik). */
-const CAM = { stream: null, el: null, starting: false, torch: false };
+const CAM = { stream: null, el: null, starting: false, torch: false, black: 0 };
 function stopCam() { if (CAM.stream) { CAM.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); CAM.stream = null; } }
-function withTimeout(p, ms) { return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]); }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+/* getUserMedia met een tijdslimiet. Komt het antwoord toch nog (bijvoorbeeld omdat iemand traag op Sta toe tikte),
+   dan gebruiken we die camera alsnog als het scherm erop wacht, en anders zetten we hem meteen weer uit. Een
+   vergeten camera houdt hem bezet, waarna elke volgende poging mislukt. */
+function gum(c, ms) {
+  const p = navigator.mediaDevices.getUserMedia(c);
+  return new Promise((res, rej) => {
+    let late = false;
+    const t = setTimeout(() => {
+      late = true; const e = new Error("timeout"); e.name = "TimeoutError"; rej(e);
+      p.then(st => { if (CAM.el && !CAM.stream) attachStream(CAM.el, st); else st.getTracks().forEach(x => x.stop()); }, () => {});
+    }, ms);
+    p.then(st => { if (!late) { clearTimeout(t); res(st); } }, e => { if (!late) { clearTimeout(t); rej(e); } });
+  });
+}
 async function getStream() {
   stopCam();
   // 4:3 zoals de fotocamera zelf: rechtop gehouden meer pixels per kaart dan breedbeeld, dus scherpere nummers
   const best = { video: { facingMode: { ideal: "environment" }, width: { ideal: 4032 }, height: { ideal: 3024 }, aspectRatio: { ideal: 4 / 3 } }, audio: false };
-  try { return await withTimeout(navigator.mediaDevices.getUserMedia(best), 7000); }
-  catch {
-    await new Promise(r => setTimeout(r, 500));
-    try { return await withTimeout(navigator.mediaDevices.getUserMedia(best), 7000); }
-    catch { return await withTimeout(navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }), 7000); }
+  const basic = { video: { facingMode: "environment" }, audio: false };
+  let last = null;
+  for (const [c, ms, pause] of [[best, 10000, 0], [best, 5000, 600], [basic, 5000, 600]]) {
+    if (pause) await wait(pause);
+    if (!CAM.el || CAM.stream) return null;                            // gesloten, of een laat antwoord is al in gebruik genomen
+    try { const st = await gum(c, ms); if (CAM.stream) { st.getTracks().forEach(x => x.stop()); return null; } return st; }
+    catch (e) { last = e; if (e && e.name === "NotFoundError") break; }
   }
+  throw last || new Error("geen camera");
 }
-async function startCam() {
+function attachStream(el, stream) {
+  const video = $("video", el);
+  CAM.stream = stream; video.srcObject = stream; video.muted = true; video.play().catch(() => {});
+  $(".camerr", el).hidden = true;
+  const tr = stream.getVideoTracks()[0];
+  if (tr) tr.addEventListener("ended", () => { if (CAM.el && CAM.stream === stream && !document.hidden) { CAM.stream = null; setTimeout(() => startCam(), 400); } });
+  const caps = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+  $(".torch", el).hidden = !caps.torch; CAM.torch = false; $(".torch", el).setAttribute("aria-pressed", "false");
+  $(".hint", el).textContent = "Leg de pagina precies in het kader";
+  setTimeout(() => {                                                   // zwart beeld: nog een paar keer opnieuw, daarna een melding
+    if (CAM.el !== el || CAM.stream !== stream) return;
+    if (video.videoWidth) { CAM.black = 0; return; }
+    stopCam(); if (++CAM.black <= 2) startCam(); else camError(el, { name: "BlackScreen" });
+  }, 3000);
+}
+function camError(el, e) {
+  const n = (e && e.name) || "";
+  const [msg, tip] = n === "NotAllowedError" || n === "SecurityError"
+    ? ["De camera heeft geen toestemming.", "Tik op Opnieuw proberen en kies Sta toe. Komt er geen vraag, zet dan in Instellingen, Apps, Safari, Camera op Vraag of Sta toe."]
+    : n === "NotReadableError" || n === "AbortError" ? ["De camera is bezet.", "Een andere app of een vorige poging gebruikt hem nog. Tik op Opnieuw proberen."]
+    : n === "TimeoutError" ? ["De camera reageert niet.", "Tik op Opnieuw proberen. Helpt dat niet, sluit de app helemaal en open hem opnieuw."]
+    : n === "BlackScreen" ? ["De camera geeft geen beeld.", "Tik op Opnieuw proberen of gebruik de gewone camera."]
+    : n === "NotFoundError" || n === "OverconstrainedError" ? ["Geen camera gevonden.", "Gebruik de gewone camera."]
+    : ["De camera start niet.", "Tik op Opnieuw proberen of gebruik de gewone camera."];
+  $(".camerr p", el).textContent = msg; $(".camerr .fine", el).textContent = tip + (n ? ` (${n})` : "");
+  $(".camerr", el).hidden = false; $(".hint", el).textContent = "";
+}
+async function startCam(auto = true) {
   if (!CAM.el || CAM.starting) return; CAM.starting = true;
-  const el = CAM.el, video = $("video", el); $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
+  const el = CAM.el; $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
   try {
-    const stream = await getStream();
+    const stream = await getStream(); if (!stream) return;
     if (!CAM.el || CAM.el !== el) { stream.getTracks().forEach(t => t.stop()); return; }      // intussen gesloten
-    CAM.stream = stream; video.srcObject = stream; video.muted = true; await video.play().catch(() => {});
-    const tr = stream.getVideoTracks()[0];
-    if (tr) tr.addEventListener("ended", () => { if (CAM.el && !document.hidden) setTimeout(startCam, 300); });
-    const caps = tr && tr.getCapabilities ? tr.getCapabilities() : {};
-    $(".torch", el).hidden = !caps.torch; CAM.torch = false; $(".torch", el).setAttribute("aria-pressed", "false");
-    $(".hint", el).textContent = "Leg de pagina precies in het kader";
-    setTimeout(() => { if (CAM.el === el && CAM.stream === stream && !video.videoWidth) { stopCam(); CAM.starting = false; startCam(); } }, 3000);   // zwart beeld: nog een keer
-  } catch {
-    if (CAM.el === el) { $(".camerr", el).hidden = false; $(".hint", el).textContent = ""; }
+    attachStream(el, stream);
+  } catch (e) {
+    if (CAM.el !== el || CAM.stream) return;
+    const quick = e && e.name !== "TimeoutError" && e.name !== "NotFoundError";
+    // net terug uit de achtergrond weigert iOS soms heel even: één keer stil opnieuw voordat we een melding tonen
+    if (auto && quick) { CAM.starting = false; await wait(1200); if (CAM.el === el && !CAM.stream) return startCam(false); return; }
+    camError(el, e);
   } finally { CAM.starting = false; }
 }
-function closeCam() { stopCam(); if (CAM.el) CAM.el.remove(); CAM.el = null; }
-document.addEventListener("visibilitychange", () => { if (!CAM.el) return; if (document.hidden) stopCam(); else startCam(); });
+function closeCam() { stopCam(); if (CAM.el) CAM.el.remove(); CAM.el = null; CAM.black = 0; }
+document.addEventListener("visibilitychange", () => {
+  if (!CAM.el) return;
+  if (document.hidden) { stopCam(); return; }
+  setTimeout(() => { if (CAM.el && !document.hidden && !CAM.stream) startCam(); }, 350);   // iOS geeft de camera pas vrij als de app echt vooraan staat
+});
 window.addEventListener("pagehide", stopCam);
 async function openCam() {
   if (CAM.el) { startCam(); return; }
   const el = document.createElement("div"); el.className = "cam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Camera");
   el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Camera starten…</div></div><div class="flash"></div>
-    <div class="camerr" hidden><p>De camera start niet.</p><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
+    <div class="camerr" hidden><p>De camera start niet.</p><span class="fine"></span><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
     <button class="native" type="button" data-cam="native">iPhone camera</button>
     <button class="torch" type="button" aria-label="Lamp" aria-pressed="false" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4zM10 8h4v13h-4z"/></svg></button>
     <div class="bar"><button class="x" type="button">Sluiten</button><button class="shut" type="button" aria-label="Foto maken"></button><button class="done" type="button">Klaar</button></div>`;
   document.body.appendChild(el); CAM.el = el;
   const video = $("video", el); let n = 0;
   $(".x", el).addEventListener("click", closeCam); $(".done", el).addEventListener("click", closeCam);
-  $("[data-cam='retry']", el).addEventListener("click", () => startCam());
+  $("[data-cam='retry']", el).addEventListener("click", () => { CAM.black = 0; stopCam(); startCam(false); });
   el.querySelectorAll("[data-cam='native']").forEach(b => b.addEventListener("click", () => { closeCam(); $("#pickCamera").click(); }));    // direct na een tik, dan mag het
   $(".torch", el).addEventListener("click", async () => {
     const tr = CAM.stream && CAM.stream.getVideoTracks()[0]; if (!tr) return;

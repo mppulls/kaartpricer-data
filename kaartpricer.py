@@ -258,7 +258,7 @@ def match(readings_path, rows_path, with_trend=False):
             if lang != "en": name = f"{name} ({lang.upper()})"
             num = printed_number(card, r.get("number"))
             if prods:
-                pid = prods[0][0]; link = LINK.format(pid=pid, cond=cond(card)) + ("&language=1" if lang == "en" else "")
+                pid = prods[0][0]; link = LINK.format(pid=pid, cond=cond(card)) + ("&language=1" if lang == "en" else "") + ("&isReverseHolo=Y" if rev else "")
                 cm = pnames.get(str(pid))
                 if cm and lang == "en" and name_score(card["name"] or "", cm) < 0.6:
                     notes.append(f"Controleer link: Cardmarket product heet '{cm}'")
