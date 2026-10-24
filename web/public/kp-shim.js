@@ -22,6 +22,7 @@
     const c = col(path);
     for (const s of c.subs) {
       let arr = [...c.docs.entries()].map(([id, v]) => ({ id, data: v.data }));
+      if (s.filt) arr = arr.filter(d => s.filt.every(([f, op, v]) => OPS[op] && OPS[op](d.data[f], v)));
       if (s.order) { const [f, dir] = s.order; arr.sort((a, b) => { const x = a.data[f], y = b.data[f]; return (x > y ? 1 : x < y ? -1 : 0) * (dir === "desc" ? -1 : 1); }); }
       else arr.sort((a, b) => a.id < b.id ? -1 : 1);
       if (s.lim) arr = arr.slice(0, s.lim);
@@ -48,15 +49,19 @@
   const tick = () => { if (document.visibilityState !== "visible") return; for (const [p, c] of cols) if (c.subs.size) poll(p); };
   setInterval(tick, 4000); document.addEventListener("visibilitychange", tick); window.addEventListener("online", tick);
 
-  function query(path, order, lim) {
+  const OPS = { "==": (a, b) => a === b, "!=": (a, b) => a !== b, "<": (a, b) => a < b, "<=": (a, b) => a <= b, ">": (a, b) => a > b, ">=": (a, b) => a >= b };
+  function query(path, order, lim, filt) {
     return {
       path,
-      orderBy: (f, dir = "asc") => query(path, [f, dir], lim),
-      limit: n => query(path, order, n),
-      where: () => { throw new TypeError("where wordt hier niet ondersteund"); },
+      orderBy: (f, dir = "asc") => query(path, [f, dir], lim, filt),
+      limit: n => query(path, order, n, filt),
+      // filter op het eigen veld; 't > x' laat ook het ophalen pas bij x beginnen (met 6 uur marge voor klokverschil)
+      where: (f, op, v) => { if (!OPS[op]) throw new TypeError("where: " + op + " wordt hier niet ondersteund"); return query(path, order, lim, [...(filt || []), [f, op, v]]); },
       async get() { await poll(path); const c = col(path); const docs = [...c.docs.entries()].map(([id, v]) => snapDoc(id, v.data)); return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: {} }; },
       onSnapshot(next, err) {
-        const c = col(path); const sub = { next, err, order, lim }; c.subs.add(sub);
+        const c = col(path); const sub = { next, err, order, lim, filt }; c.subs.add(sub);
+        const tf = (filt || []).find(([f, op]) => f === "t" && (op === ">" || op === ">="));
+        if (tf && !c.loaded && Number.isFinite(tf[2])) c.since = Math.max(c.since, tf[2] - 6 * 3600e3);
         if (c.loaded) setTimeout(() => notify(path), 0); poll(path);
         return () => c.subs.delete(sub);
       },
