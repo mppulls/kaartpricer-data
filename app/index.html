@@ -17,6 +17,7 @@
   --accent-ink: #ffffff;
   --accent-soft: #e6eaff;
   --ok: #0d7a53;
+  --ok-soft: #dff3ea;
   --warn: #9a5200;
   --warn-soft: #fff1dc;
   --bad: #b8301a;
@@ -31,7 +32,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
-    --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --warn: #f1a640; --warn-soft: #2b2112;
+    --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --ok-soft: #12271e; --warn: #f1a640; --warn-soft: #2b2112;
     --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
     color-scheme: dark;
@@ -39,7 +40,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #0d0f14; --surface: #161a22; --surface-2: #1e232d; --ink: #edf0f5; --muted: #98a2b3; --line: #262c37;
-  --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --warn: #f1a640; --warn-soft: #2b2112;
+  --accent: #8697ff; --accent-ink: #0d0f14; --accent-soft: #1d2442; --ok: #3cc98f; --ok-soft: #12271e; --warn: #f1a640; --warn-soft: #2b2112;
   --bad: #ff7a63; --bad-soft: #2d1714; --new: #1d2442; --shade: rgba(0, 0, 0, .6);
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
   color-scheme: dark;
@@ -204,6 +205,26 @@ main .wrap { padding-block: 4px 16px; display: grid; gap: 12px; }
 .sheet .item .t { flex: 1; min-width: 0; }
 .sheet .item small { color: var(--muted); display: block; font-size: 12px; }
 .sheet .item.on { outline: 2px solid var(--accent); }
+/* menu: tegels per soort actie, elk met een eigen kleur en icoon */
+.mgroup { display: grid; gap: 6px; }
+.mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mtile { display: grid; align-content: start; gap: 6px; padding: 12px; border-radius: 14px; background: var(--bg); text-align: left; min-height: 96px; min-width: 0; }
+.mtile b { font-size: 14px; line-height: 1.25; }
+.mtile small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+.mtile:disabled { opacity: .5; }
+.mtile.wide { grid-column: 1 / -1; min-height: 0; grid-template-columns: auto 1fr; align-items: center; column-gap: 10px; }
+.mtile.wide .mt { display: grid; gap: 2px; min-width: 0; }
+.mi { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+.mi svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mi.blue { background: var(--accent-soft); color: var(--accent); }
+.mi.green { background: var(--ok-soft); color: var(--ok); }
+.mi.amber { background: var(--warn-soft); color: var(--warn); }
+.mi.grey { background: var(--surface-2); color: var(--muted); }
+.mi.red { background: var(--bad-soft); color: var(--bad); }
+.mtile.danger { box-shadow: inset 0 0 0 1.5px var(--bad-soft); } .mtile.danger b { color: var(--bad); }
+.btn.danger.solid { background: var(--bad); color: #fff; }
+.confirm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .confirm .btn { height: 46px; justify-content: center; }
+.warnhead { display: flex; align-items: center; gap: 10px; }
 .field { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
 .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 30; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
@@ -547,7 +568,7 @@ function photoThumb(bm) { const s = 96 / Math.max(bm.width, bm.height); const c 
 /* ---------------------------------------------------------------- opslag */
 const S = { db: null, sample: null, mcp: null, limits: null, lists: [], listId: null, scans: new Map(), live: new Map(),
   filter: "all", open: null, fresh: new Set(), queue: [], running: 0, bitmaps: new Map(), unsubScans: null, local: false,
-  buys: [], unsubBuys: null, openBuy: null };
+  buys: [], unsubBuys: null, openBuy: null, gone: new Set() };
 const listOf = () => S.lists.find(l => l.id === S.listId) || null;
 /* wie gebruikt deze telefoon: iedereen eigen lijsten, inkopen en afronden; lijsten zonder eigenaar zijn van iedereen */
 const ME = { name: (() => { try { return localStorage.getItem("kaartscan.wie") || ""; } catch { return ""; } })() };
@@ -600,6 +621,7 @@ async function putList(l) {
 }
 function stripId(o) { const { id, ...rest } = o; return rest; }
 async function putScan(s) {
+  if (S.gone.has(s.id)) return;                              // net verwijderd terwijl hij nog gelezen werd: niet terugzetten
   const body = { list: s.list, t: s.t, status: s.status, n: (s.kaarten || []).length, foto: s.foto || null, hand: !!s.hand, dim: s.dim || null, pct: isNum(s.pct) ? s.pct : null, trend: typeof s.trend === "boolean" ? s.trend : null,
     kaarten: (s.kaarten || []).map(k => ({ k: k.k, box: k.box || null, lez: k.lez || {}, st: k.st, sid: k.sid || null, lid: k.lid || null, alts: k.alts || [], rev: !!k.rev, eigen: Number.isFinite(k.eigen) ? k.eigen : null, low: Number.isFinite(k.low) ? k.low : null, lowT: k.lowT || null, thumb: k.thumb || null, lang: k.lang || null, pct: isNum(k.pct) ? k.pct : null })) };
   if (S.db) {
@@ -614,6 +636,7 @@ async function putScan(s) {
   } else { S.scans.set(s.id, s); saveLocal(); }
 }
 async function deleteScanDoc(s) {
+  S.gone.add(s.id); S.queue = S.queue.filter(j => j.id !== s.id); S.bitmaps.delete(s.id);
   if (S.db) await serial(`lijsten/${s.list}/scans/${s.id}`, () => S.db.doc(`lijsten/${s.list}/scans/${s.id}`).delete());
   S.scans.delete(s.id); S.live.delete(s.id); saveLocal();
 }
@@ -849,7 +872,7 @@ function retryScan(s, tier) {
 /* ---------------------------------------------------------------- bewerken */
 function allScans() {
   const m = new Map(S.scans); for (const [id, l] of S.live) m.set(id, l);
-  return [...m.values()].filter(s => s.list === S.listId || !s.list).sort((a, b) => b.t - a.t);
+  return [...m.values()].filter(s => (s.list === S.listId || !s.list) && !S.gone.has(s.id)).sort((a, b) => b.t - a.t);
 }
 function scanById(id) { return S.live.get(id) || S.scans.get(id); }
 async function mutateScan(scanId, fn) {
@@ -1214,21 +1237,66 @@ async function deleteList() {
   clearSelection(); const next = pickDefaultList(); if (next) selectList(next.id); else render();
   toast("Lijst verwijderd");
 }
+const MI = {
+  tag: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  bag: '<path d="M5 8h14l-1.2 12H6.2L5 8Z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+  sheet: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  lists: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  down: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/>',
+};
+const mIcon = (k, c) => `<span class="mi ${c}" aria-hidden="true"><svg viewBox="0 0 24 24">${MI[k]}</svg></span>`;
+const mTile = (m, icon, color, title, sub, extra = "") => `<button class="mtile${extra}" data-m="${m}">${mIcon(icon, color)}<b>${title}</b><small>${sub}</small></button>`;
 function openMenu() {
+  const scans = allScans(), n = scans.reduce((a, x) => a + (x.kaarten || []).length, 0);
   sheet(`<h3>${esc(listOf() ? listOf().naam : "Kaartscan")}</h3>
-    <button class="item" data-m="sheet"><span class="t"><b>Lijst naar Google Sheet</b><small>De kaarten die nu in je lijst staan</small></span></button>
-    <button class="item" data-m="copy"><span class="t"><b>Kopieer lijst</b><small>Als tabel om te plakken</small></span></button>
-    <button class="item" data-m="buy"><span class="t"><b>Inkoop opslaan</b><small>De kaarten in je lijst als inkoop bewaren</small></span></button>
-    <button class="item" data-m="finish"><span class="t"><b>Dag afronden</b><small>Alle inkopen van vandaag naar je sheet</small></span></button>
-    <button class="item" data-m="low"><span class="t"><b>Prijzen checken</b><small>Alle kaarten langs: Cardmarket openen en prijs invullen</small></span></button>
-    <button class="item" data-m="add"><span class="t"><b>Zoek een kaart</b><small>${listTrend() ? "Trend en Cardmarket direct" : "Cardmarket direct"}, of toevoegen aan je lijst</small></span></button>
-    <button class="item" data-m="lists"><span class="t"><b>Lijsten</b><small>Wisselen, nieuw, hernoemen</small></span></button>
-    ${STANDALONE ? `<button class="item" data-m="import"><span class="t"><b>Lijsten uit Claude importeren</b><small>Eenmalig, je lijsten en inkopen uit de Claude versie</small></span></button>` : ""}
+    <div class="mgroup"><div class="lbl">Prijzen</div><div class="mgrid">
+      ${mTile("low", "tag", "blue", "Prijzen checken", "Alle kaarten langs op Cardmarket")}
+      ${mTile("add", "search", "blue", "Zoek een kaart", listTrend() ? "Trend en Cardmarket, of toevoegen" : "Cardmarket, of toevoegen")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Inkoop</div><div class="mgrid">
+      ${mTile("buy", "bag", "green", "Inkoop opslaan", "Kaarten in je lijst als inkoop")}
+      ${mTile("finish", "flag", "green", "Dag afronden", "Inkopen van vandaag naar je sheet")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Versturen</div><div class="mgrid">
+      ${mTile("sheet", "sheet", "amber", "Lijst naar Sheet", "Wat nu in je lijst staat")}
+      ${mTile("copy", "copy", "amber", "Kopieer lijst", "Als tabel om te plakken")}
+    </div></div>
+    <div class="mgroup"><div class="lbl">Lijst</div><div class="mgrid">
+      ${mTile("lists", "lists", "grey", "Lijsten", "Wisselen, nieuw, hernoemen")}
+      <button class="mtile danger" data-m="clear"${scans.length ? "" : " disabled"}>${mIcon("trash", "red")}<b>Lijst leegmaken</b><small>${scans.length ? `${n} ${n === 1 ? "kaart" : "kaarten"} verwijderen` : "Lijst is al leeg"}</small></button>
+      ${STANDALONE ? `<button class="mtile wide" data-m="import">${mIcon("down", "grey")}<span class="mt"><b>Lijsten uit Claude importeren</b><small>Eenmalig, je lijsten en inkopen uit de Claude versie</small></span></button>` : ""}
+    </div></div>
     <p class="fine">Je bod rekent met de prijs die je per kaart invult. Trend staat standaard uit. Zet hem aan via Bod ▾ bovenin, of per foto via ⋯, dan telt de Cardmarket trend ${PR.datum ? "van " + fmtDate(parseDate(PR.datum)) + " " : ""}mee als er geen prijs is.</p>`,
     (e, close) => {
-      const m = e.target.closest("[data-m]"); if (!m) return; close();
-      if (m.dataset.m === "sheet") toSheet(); else if (m.dataset.m === "buy") openBuySheet(); else if (m.dataset.m === "finish") openFinish(); else if (m.dataset.m === "low") openLow(); else if (m.dataset.m === "copy") copyList(); else if (m.dataset.m === "add") openSearch(null, null); else if (m.dataset.m === "import") importSeed(); else openLists();
+      const m = e.target.closest("[data-m]"); if (!m || m.disabled) return; close();
+      const go = { sheet: toSheet, buy: openBuySheet, finish: openFinish, low: openLow, copy: copyList, add: () => openSearch(null, null), import: importSeed, clear: openClear, lists: openLists }[m.dataset.m];
+      if (go) go();
     });
+}
+/* lijst leegmaken: alle foto's en kaarten weg, de lijst zelf en opgeslagen inkopen blijven */
+function openClear() {
+  const l = listOf(), scans = allScans(); if (!scans.length) { toast("Deze lijst is al leeg"); return; }
+  const n = scans.reduce((a, x) => a + (x.kaarten || []).length, 0), f = scans.filter(x => !x.hand).length, who = ownerOf(l);
+  sheet(`<div class="warnhead">${mIcon("trash", "red")}<h3>Lijst leegmaken?</h3></div>
+    <p style="margin:0">Alle ${n} ${n === 1 ? "kaart" : "kaarten"}${f ? ` en ${f} ${f === 1 ? "foto" : "foto's"}` : ""} in <b>${esc(l ? l.naam : "deze lijst")}</b> worden verwijderd. Dit kun je niet terugdraaien.</p>
+    ${who ? `<div class="notice" style="color:var(--bad)"><b style="color:inherit">Let op: dit is een lijst van ${esc(who)}.</b></div>` : ""}
+    <p class="fine" style="margin:0">De lijst zelf, met naam en bod, blijft staan. Opgeslagen inkopen blijven ook bewaard.</p>
+    <div class="confirm"><button class="btn" data-c="no">Annuleer</button><button class="btn danger solid" data-c="yes">Ja, alles verwijderen</button></div>`,
+    async (e, close) => { const b = e.target.closest("[data-c]"); if (!b) return; close(); if (b.dataset.c === "yes") await clearList(); });
+}
+async function clearList() {
+  const scans = allScans(); if (!scans.length) return;
+  S.open = null; S.vers = null;
+  for (const x of scans) { S.gone.add(x.id); S.bitmaps.delete(x.id); }
+  S.queue = S.queue.filter(j => !S.gone.has(j.id)); render();
+  let fail = 0;
+  for (let i = 0; i < scans.length; i += 8) await Promise.all(scans.slice(i, i + 8).map(x => deleteScanDoc(x).catch(() => { fail++; S.gone.delete(x.id); })));
+  saveLocal(); render();
+  toast(fail ? `Lijst leeggemaakt, ${fail} ${fail === 1 ? "foto kon" : "foto's konden"} niet weg. Probeer het nog een keer.` : "Lijst leeggemaakt");
 }
 function openScanMenu(sId) {
   const s = scanById(sId); if (!s) return; const hasBm = S.bitmaps.has(sId);
