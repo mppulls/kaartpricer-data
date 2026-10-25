@@ -1800,7 +1800,8 @@ function toast(msg, ms = 3200, action) {
    iPhone zet de camera stil zodra de app naar de achtergrond gaat (bijvoorbeeld even naar Cardmarket). Daarom: bij weggaan de camera
    netjes vrijgeven, bij terugkomen opnieuw starten, een vastgelopen start afbreken en opnieuw proberen, en als het echt niet lukt een
    knop tonen voor de gewone camera (die mag iPhone alleen openen direct na een tik). */
-const CAM = { stream: null, el: null, starting: false, torch: false, black: 0 };
+const CAM = { stream: null, el: null, starting: false, torch: false, black: 0, warmT: null };
+const CAM_WARM = 120000;                                              // camera na sluiten nog even aan: snel weer open en iOS houdt de toestemming vast
 function stopCam() { if (CAM.stream) { CAM.stream.getTracks().forEach(t => { try { t.stop(); } catch {} }); CAM.stream = null; } }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 /* getUserMedia met een tijdslimiet. Komt het antwoord toch nog (bijvoorbeeld omdat iemand traag op Sta toe tikte),
@@ -1827,7 +1828,7 @@ async function getStream() {
     if (pause) await wait(pause);
     if (!CAM.el || CAM.stream) return null;                            // gesloten, of een laat antwoord is al in gebruik genomen
     try { const st = await gum(c, ms); if (CAM.stream) { st.getTracks().forEach(x => x.stop()); return null; } return st; }
-    catch (e) { last = e; if (e && e.name === "NotFoundError") break; }
+    catch (e) { last = e; if (e && /^(NotFoundError|NotAllowedError|SecurityError)$/.test(e.name)) break; }   // geweigerd: opnieuw vragen helpt hier niet
   }
   throw last || new Error("geen camera");
 }
@@ -1846,37 +1847,67 @@ function attachStream(el, stream) {
     stopCam(); if (++CAM.black <= 2) startCam(); else camError(el, { name: "BlackScreen" });
   }, 3000);
 }
+/* iOS app op het beginscherm: na ongeveer een minuut zonder camera vervalt de toestemming en vraagt iOS niet opnieuw
+   (NotAllowedError). Alleen een verse start van de pagina krijgt weer een vraag. Dus: alles opslaan, de pagina opnieuw
+   laden en de camera meteen weer openen. Hooguit één keer per halve minuut, zodat het nooit blijft herhalen.
+   Om dat zo weinig mogelijk nodig te hebben blijft de camera na Sluiten of Klaar nog twee minuten warm (zie closeCam). */
+const CAM_RELOAD = "kp.camReload";
+const camBusy = () => S.queue.length + S.running + [...S.live.values()].filter(x => ["wacht", "lezen", "nummers", "offline", "fout"].includes(x.status)).length;
+function lastCamReload() { try { return Number(sessionStorage.getItem(CAM_RELOAD) || 0); } catch { return Date.now(); } }
+async function reloadForCam(el, force) {
+  if (!force && (Date.now() - lastCamReload() < 30000 || camBusy())) return false;
+  try { sessionStorage.setItem(CAM_RELOAD, String(Date.now())); } catch { return false; }
+  stopCam(); $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera opnieuw opstarten…";
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  await Promise.race([Promise.all([...chains.values()]), wait(4000)]);          // lopende opslag eerst afmaken
+  location.reload(); return true;
+}
 function camError(el, e) {
   const n = (e && e.name) || "";
-  const [msg, tip] = n === "NotAllowedError" || n === "SecurityError"
-    ? ["De camera heeft geen toestemming.", "Tik op Opnieuw proberen en kies Sta toe. Komt er geen vraag, zet dan in Instellingen, Apps, Safari, Camera op Vraag of Sta toe."]
+  const busy = camBusy(), denied = n === "NotAllowedError" || n === "SecurityError", fresh = Date.now() - lastCamReload() < 30000;
+  const offerReload = denied && STANDALONE && !fresh;            // net herstart: dan eerst gewoon opnieuw vragen met een tik
+  const [msg, tip] = denied && STANDALONE && fresh
+    ? ["De camera heeft nog geen toestemming.", "Tik op Opnieuw proberen en kies Sta toe. Komt er geen vraag, veeg de app dan weg en open hem opnieuw."]
+    : offerReload
+    ? ["De camera heeft geen toestemming meer.", busy ? `Tik op App herstarten, dan vraagt iOS weer om toestemming. Let op: ${busy} ${busy === 1 ? "foto is" : "foto's zijn"} nog niet gelezen en ${busy === 1 ? "gaat" : "gaan"} dan verloren.` : "Tik op App herstarten en kies daarna Sta toe. Helpt dat niet, veeg de app weg en open hem opnieuw."]
+    : denied ? ["De camera heeft geen toestemming.", "Tik op Opnieuw proberen en kies Sta toe. Komt er geen vraag, zet dan in Instellingen, Apps, Safari, Camera op Vraag of Sta toe."]
     : n === "NotReadableError" || n === "AbortError" ? ["De camera is bezet.", "Een andere app of een vorige poging gebruikt hem nog. Tik op Opnieuw proberen."]
     : n === "TimeoutError" ? ["De camera reageert niet.", "Tik op Opnieuw proberen. Helpt dat niet, sluit de app helemaal en open hem opnieuw."]
     : n === "BlackScreen" ? ["De camera geeft geen beeld.", "Tik op Opnieuw proberen of gebruik de gewone camera."]
     : n === "NotFoundError" || n === "OverconstrainedError" ? ["Geen camera gevonden.", "Gebruik de gewone camera."]
     : ["De camera start niet.", "Tik op Opnieuw proberen of gebruik de gewone camera."];
   $(".camerr p", el).textContent = msg; $(".camerr .fine", el).textContent = tip + (n ? ` (${n})` : "");
+  $("[data-cam='reload']", el).hidden = !offerReload; $("[data-cam='retry']", el).hidden = offerReload;
   $(".camerr", el).hidden = false; $(".hint", el).textContent = "";
 }
 async function startCam(auto = true) {
-  if (!CAM.el || CAM.starting) return; CAM.starting = true;
-  const el = CAM.el; $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
+  if (!CAM.el || CAM.starting) return;
+  const el = CAM.el; clearTimeout(CAM.warmT);
+  if (CAM.stream && CAM.stream.getVideoTracks().some(t => t.readyState === "live")) { attachStream(el, CAM.stream); return; }   // nog warm
+  CAM.starting = true; $(".camerr", el).hidden = true; $(".hint", el).textContent = "Camera starten…";
   try {
     const stream = await getStream(); if (!stream) return;
     if (!CAM.el || CAM.el !== el) { stream.getTracks().forEach(t => t.stop()); return; }      // intussen gesloten
     attachStream(el, stream);
   } catch (e) {
     if (CAM.el !== el || CAM.stream) return;
-    const quick = e && e.name !== "TimeoutError" && e.name !== "NotFoundError";
+    const denied = e && (e.name === "NotAllowedError" || e.name === "SecurityError");
+    if (denied && STANDALONE && await reloadForCam(el)) return;
+    const quick = !denied && e && e.name !== "TimeoutError" && e.name !== "NotFoundError";
     // net terug uit de achtergrond weigert iOS soms heel even: één keer stil opnieuw voordat we een melding tonen
     if (auto && quick) { CAM.starting = false; await wait(1200); if (CAM.el === el && !CAM.stream) return startCam(false); return; }
     camError(el, e);
   } finally { CAM.starting = false; }
 }
-function closeCam() { stopCam(); if (CAM.el) CAM.el.remove(); CAM.el = null; CAM.black = 0; }
+function closeCam() {
+  if (CAM.el) CAM.el.remove(); CAM.el = null; CAM.black = 0;
+  const tr = CAM.stream && CAM.stream.getVideoTracks()[0];
+  if (tr && CAM.torch) { CAM.torch = false; tr.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {}); }
+  clearTimeout(CAM.warmT); CAM.warmT = CAM.stream ? setTimeout(stopCam, CAM_WARM) : null;
+}
 document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { clearTimeout(CAM.warmT); stopCam(); return; }
   if (!CAM.el) return;
-  if (document.hidden) { stopCam(); return; }
   setTimeout(() => { if (CAM.el && !document.hidden && !CAM.stream) startCam(); }, 350);   // iOS geeft de camera pas vrij als de app echt vooraan staat
 });
 window.addEventListener("pagehide", stopCam);
@@ -1884,7 +1915,7 @@ async function openCam() {
   if (CAM.el) { startCam(); return; }
   const el = document.createElement("div"); el.className = "cam"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Camera");
   el.innerHTML = `<video playsinline autoplay muted></video><div class="guide"><div class="hint">Camera starten…</div></div><div class="flash"></div>
-    <div class="camerr" hidden><p>De camera start niet.</p><span class="fine"></span><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
+    <div class="camerr" hidden><p>De camera start niet.</p><span class="fine"></span><button class="btn primary" type="button" data-cam="retry">Opnieuw proberen</button><button class="btn primary" type="button" data-cam="reload" hidden>App herstarten</button><button class="btn" type="button" data-cam="native">Gewone camera gebruiken</button></div>
     <button class="native" type="button" data-cam="native">iPhone camera</button>
     <button class="torch" type="button" aria-label="Lamp" aria-pressed="false" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4zM10 8h4v13h-4z"/></svg></button>
     <div class="bar"><button class="x" type="button">Sluiten</button><button class="shut" type="button" aria-label="Foto maken"></button><button class="done" type="button">Klaar</button></div>`;
@@ -1892,7 +1923,8 @@ async function openCam() {
   const video = $("video", el); let n = 0;
   $(".x", el).addEventListener("click", closeCam); $(".done", el).addEventListener("click", closeCam);
   $("[data-cam='retry']", el).addEventListener("click", () => { CAM.black = 0; stopCam(); startCam(false); });
-  el.querySelectorAll("[data-cam='native']").forEach(b => b.addEventListener("click", () => { closeCam(); $("#pickCamera").click(); }));    // direct na een tik, dan mag het
+  $("[data-cam='reload']", el).addEventListener("click", () => reloadForCam(el, true));
+  el.querySelectorAll("[data-cam='native']").forEach(b => b.addEventListener("click", () => { closeCam(); clearTimeout(CAM.warmT); stopCam(); $("#pickCamera").click(); }));    // direct na een tik, dan mag het
   $(".torch", el).addEventListener("click", async () => {
     const tr = CAM.stream && CAM.stream.getVideoTracks()[0]; if (!tr) return;
     CAM.torch = !CAM.torch; try { await tr.applyConstraints({ advanced: [{ torch: CAM.torch }] }); } catch { CAM.torch = false; }
@@ -1944,6 +1976,7 @@ async function boot() {
   else { S.local = true; loadLocal(); const l = pickDefaultList(); if (l) S.listId = l.id; }
   watchMem();
   render();
+  if (STANDALONE && navigator.mediaDevices && Date.now() - lastCamReload() < 20000) setTimeout(() => { if (!CAM.el) openCam(); }, 250);   // herstart voor de camera: meteen weer open
   if (!ME.name && (db || STANDALONE)) setTimeout(() => { if (!ME.name && !$("#sheetHost").innerHTML) openWho(); }, 600);
 }
 boot();
